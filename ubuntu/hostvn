@@ -379,13 +379,13 @@ EOnginx_service
 }
 
 install_mariadb() {
+    export DEBIAN_FRONTEND=noninteractive
+
     apt-get update
     apt-get install -y software-properties-common wget ca-certificates gnupg lsb-release
 
     wget https://downloads.mariadb.com/MariaDB/mariadb_repo_setup -O mariadb_repo_setup
     chmod +x mariadb_repo_setup
-
-    # Luôn dùng version cố định từ biến MARIADB_VERSION
     ./mariadb_repo_setup --mariadb-server-version="mariadb-${MARIADB_VERSION}"
 
     apt-get update
