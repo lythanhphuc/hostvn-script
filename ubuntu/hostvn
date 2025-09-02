@@ -1990,9 +1990,12 @@ server {
 }
 
 server {
-    listen ${RANDOM_ADMIN_PORT};
+    listen ${RANDOM_ADMIN_PORT} ssl;
 
     server_name ${IPADDRESS};
+
+    ssl_certificate         /etc/nginx/ssl/server/server.crt;
+    ssl_certificate_key     /etc/nginx/ssl/server/server.key;
 
     access_log off;
     log_not_found off;
