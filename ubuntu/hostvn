@@ -2393,6 +2393,8 @@ character-set-server = utf8mb4
 datadir=/var/lib/mysql
 socket = /run/mysqld/mysqld.sock
 
+sql-mode=NO_ENGINE_SUBSTITUTION
+
 #bind-address=127.0.0.1
 
 tmpdir=/tmp
