@@ -6,7 +6,7 @@
 
 <p align="center"> <img src="https://blog.hostvn.net/wp-content/uploads/2020/07/logo-big-2.png" /> </p>
 
-> [!LƯU Ý]
+> [!IMPORTANT]
 > Vì Ubuntu 20.04 không còn được hỗ trợ nên mình edit phiên bản này cơ bản để chạy được trên 24.04 và cập nhật thư viện lên phiên bản mới hơn, các lỗi của script vẫn còn đó vì mình không biết fix, chỉ nên dùng tạm thời trong lúc chờ tác giả ra bản mới.
 
 ########################################################################
