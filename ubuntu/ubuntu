@@ -110,16 +110,10 @@ EOsource_list
     if [ "${OS_VER}" == "22.04" ]; then
         mv /etc/apt/sources.list /etc/apt/sources.list."$(date +%Y-%m-%d)"
         cat >> "/etc/apt/sources.list" << EOsource_list
-deb http://archive.ubuntu.com/ubuntu/ jammy main restricted
-deb http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted
-deb http://archive.ubuntu.com/ubuntu/ jammy universe
-deb http://archive.ubuntu.com/ubuntu/ jammy-updates universe
-deb http://archive.ubuntu.com/ubuntu/ jammy multiverse
-deb http://archive.ubuntu.com/ubuntu/ jammy-updates multiverse
-deb http://archive.ubuntu.com/ubuntu/ jammy-backports main restricted universe multiverse
-deb http://security.ubuntu.com/ubuntu jammy-security main restricted
-deb http://security.ubuntu.com/ubuntu jammy-security universe
-deb http://security.ubuntu.com/ubuntu jammy-security multiverse
+deb http://archive.ubuntu.com/ubuntu jammy main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu jammy-updates main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu jammy-backports main restricted universe multiverse
+deb http://security.ubuntu.com/ubuntu jammy-security main restricted universe multiverse
 EOsource_list
 
         apt update -y
@@ -127,34 +121,27 @@ EOsource_list
     if [ "${OS_VER}" == "24.04" ]; then
         mv /etc/apt/sources.list /etc/apt/sources.list."$(date +%Y-%m-%d)"
         cat >> "/etc/apt/sources.list" << EOsource_list
-deb http://archive.ubuntu.com/ubuntu/ noble main restricted
-deb http://archive.ubuntu.com/ubuntu/ noble-updates main restricted
-deb http://archive.ubuntu.com/ubuntu/ noble universe
-deb http://archive.ubuntu.com/ubuntu/ noble-updates universe
-deb http://archive.ubuntu.com/ubuntu/ noble multiverse
-deb http://archive.ubuntu.com/ubuntu/ noble-updates multiverse
-deb http://archive.ubuntu.com/ubuntu/ noble-backports main restricted universe multiverse
-deb http://security.ubuntu.com/ubuntu noble-security main restricted
-deb http://security.ubuntu.com/ubuntu noble-security universe
-deb http://security.ubuntu.com/ubuntu noble-security multiverse
+deb http://archive.ubuntu.com/ubuntu noble main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse
+deb http://security.ubuntu.com/ubuntu noble-security main restricted universe multiverse
 EOsource_list
 
         apt update -y
     fi
 }
 
-install_requirement(){
-    apt-get install build-essential gcc g++ make flex bison openssl libssl-dev perl perl-base perl-modules libperl-dev \
-        libperl4-corelibs-perl libwww-perl libaio1 libaio-dev gifsicle webp libde265-dev \
-        zlib1g zlib1g-dev libcap-dev cron bzip2 zip automake autoconf libtool cmake python libdb-dev libsasl2-dev \
-        libncurses5 libncurses5-dev libsystemd-dev bind9 dnsutils quota patch logrotate rsyslog libc6-dev libexpat1-dev \
-        libcrypt-openssl-rsa-perl libnuma-dev libnuma1 git dos2unix ipcalc unzip net-tools wget apache2-utils grc \
-        libjpeg-dev libpng-dev libtiff-dev libgif-dev libwebp-dev imagemagick libpcre3 libpcre3-dev uuid-dev \
-        gnupg2 ca-certificates lsb-release apache2-dev libxml2-dev libcurl4-openssl-dev liblmdb-dev libgeoip-dev pkgconf \
-        libpcre++-dev libyajl-dev apt-utils htop nano supervisor bc libmaxminddb-dev -y
+install_requirement() {
+    echo "==== Cap nhat he thong va cai dat cac goi yeu cau ===="
+    apt-get update -y
+    apt-get upgrade -y
 
-    service supervisor stop
-    systemctl disable supervisor
+    apt-get install -y \
+        curl wget git software-properties-common lsb-release ca-certificates zip unzip \
+        build-essential gcc g++ make cmake autoconf automake pkg-config libtool \
+        zlib1g-dev libpcre3 libpcre3-dev libssl-dev libxml2-dev libcurl4-openssl-dev \
+        libjpeg-turbo8-dev libpng-dev libfreetype6-dev libzip-dev libicu-dev \
+        libsqlite3-dev libxslt-dev
 }
 
 create_swap(){
@@ -229,7 +216,7 @@ if [[ " ${LIST_OS_VER_SUPPORT[*]} " == *" ${OS_VER} "* ]]; then
 else
     clear
     printf "${RED}%s${NC}" "Ban dang su dung phien ban ${OS} ${OS_VER}."
-    printf "${RED}%s${NC}" "Hien tai Scripts chi ho tro Ubuntu 18.04, 20.04, 22.04, 24.04 va Debian 10."
+    printf "${RED}%s${NC}" "Hien tai Scripts chi ho tro Ubuntu 22.04, 24.04."
     printf "${RED}%s${NC}" "Huy cai dat."
     exit
 fi
