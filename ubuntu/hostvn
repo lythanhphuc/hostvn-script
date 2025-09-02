@@ -276,7 +276,7 @@ check_duplicate_php() {
 }
 
 install_nginx(){
-    apt-get install build-essential zlib1g-dev libpcre3 libpcre3-dev unzip uuid-dev libbrotli-dev -y
+    apt-get install -y build-essential zlib1g-dev libpcre2-dev unzip uuid-dev libbrotli-dev
     apt autoremove -y
     UPDATE_LINK="https://raw.githubusercontent.com/lythanhphuc/hostvn-script/master/ubuntu/update"
     MODULE_PATH="/usr/share/nginx_module"
@@ -339,7 +339,6 @@ install_nginx(){
         "--with-pcre-jit" \
         "--with-zlib=../zlib-${zlib_version}" \
         "--with-openssl=../openssl-OpenSSL_${openssl_version}" \
-        "--with-openssl-opt=no-nextprotoneg" \
         "--add-module=../ngx_cache_purge-${ngx_cache_purge_version}" \
         "--add-module=../headers-more-nginx-module-${more_clear_headers_v}" \
         "--add-module=../nginx-module-vts-${nginx_module_vts_v}" \
@@ -351,8 +350,7 @@ install_nginx(){
         ln -s /usr/lib/nginx/modules /etc/nginx/modules
     fi
 
-    adduser --system --home /nonexistent --shell /bin/false --no-create-home --disabled-login --disabled-password \
-        --gecos "nginx user" --group nginx
+    id -u nginx &>/dev/null || adduser --system --home /nonexistent --shell /bin/false --no-create-home --disabled-login --disabled-password --gecos "nginx user" --group nginx
 
     rm -rf /etc/systemd/system/nginx.service
     cat >> "/etc/systemd/system/nginx.service" << EOnginx_service
@@ -375,22 +373,23 @@ LimitNOFILE=65535
 WantedBy=multi-user.target
 EOnginx_service
 
-    sudo systemctl enable nginx.service
-    sudo systemctl start nginx.service
+    sudo systemctl enable nginx
+    sudo systemctl start nginx
     cd_dir "${DIR}"
 }
 
 install_mariadb() {
     apt-get update
-    apt-get install software-properties-common apt-transport-https wget ca-certificates gnupg lsb-release -y
+    apt-get install -y software-properties-common wget ca-certificates gnupg lsb-release
 
-    wget https://downloads.mariadb.com/MariaDB/mariadb_repo_setup
-    echo "b7519209546e1656e5514c04b4dcffdd9b4123201bcd1875a361ad79eb943bbe mariadb_repo_setup" | sha256sum -c -
+    wget https://downloads.mariadb.com/MariaDB/mariadb_repo_setup -O mariadb_repo_setup
     chmod +x mariadb_repo_setup
+
+    # Luôn dùng version cố định từ biến MARIADB_VERSION
     ./mariadb_repo_setup --mariadb-server-version="mariadb-${MARIADB_VERSION}"
 
     apt-get update
-    apt-get install mariadb-server mariadb-backup -y
+    apt-get install -y mariadb-server mariadb-backup
 
     systemctl enable mariadb
     systemctl start mariadb
@@ -398,10 +397,7 @@ install_mariadb() {
 
 
 install_php() {
-    add-apt-repository ppa:ondrej/php <<EOF
-
-EOF
-
+    add-apt-repository -y ppa:ondrej/php
     apt-get update -y
 
     apt-get -y install php"${PHP_VERSION}" php"${PHP_VERSION}"-fpm php"${PHP_VERSION}"-ldap php"${PHP_VERSION}"-zip \
@@ -409,41 +405,24 @@ EOF
         php"${PHP_VERSION}"-mbstring php"${PHP_VERSION}"-common php"${PHP_VERSION}"-soap \
         php"${PHP_VERSION}"-curl php"${PHP_VERSION}"-bcmath php"${PHP_VERSION}"-snmp php"${PHP_VERSION}"-pspell \
         php"${PHP_VERSION}"-gmp php"${PHP_VERSION}"-intl php"${PHP_VERSION}"-imap php"${PHP_VERSION}"-enchant \
-        php"${PHP_VERSION}"-xmlrpc php"${PHP_VERSION}"-tidy php"${PHP_VERSION}"-opcache php"${PHP_VERSION}"-cli \
-        php"${PHP_VERSION}"-dev php"${PHP_VERSION}"-imagick php"${PHP_VERSION}"-sqlite3
+        php"${PHP_VERSION}"-tidy php"${PHP_VERSION}"-opcache php"${PHP_VERSION}"-dev php"${PHP_VERSION}"-imagick \
+        php"${PHP_VERSION}"-sqlite3
 
-    if [ "${PHP_VERSION}" != "8.0" ]; then
-        apt -y install php"${PHP_VERSION}"-json
-    fi
+    # Tạo override systemd để harden php-fpm
+    mkdir -p /etc/systemd/system/php${PHP_VERSION}-fpm.service.d
+    cat > /etc/systemd/system/php${PHP_VERSION}-fpm.service.d/override.conf <<EOF
+[Service]
+LimitNOFILE=65535
+LimitMEMLOCK=infinity
+PrivateTmp=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+EOF
 
-    if [ "${PHP_VERSION}" == "5.6" ]; then
-        apt -y install php5.6-mcrypt
-    fi
-
-    if [ -f "/usr/lib/systemd/system/php${PHP_VERSION}-fpm.service" ]; then
-        sed -i '/ExecReload=/a LimitNOFILE=65535' /usr/lib/systemd/system/php"${PHP_VERSION}"-fpm.service
-        sed -i '/ExecReload=/a LimitMEMLOCK=infinity' /usr/lib/systemd/system/php"${PHP_VERSION}"-fpm.service
-        sed -i '/LimitNOFILE=65535/a PrivateTmp=true' /usr/lib/systemd/system/php"${PHP_VERSION}"-fpm.service
-        sed -i '/PrivateTmp=true/a ProtectKernelModules=true' /usr/lib/systemd/system/php"${PHP_VERSION}"-fpm.service
-        sed -i '/ProtectKernelModules=true/a ProtectKernelTunables=true' /usr/lib/systemd/system/php"${PHP_VERSION}"-fpm.service
-        sed -i '/ProtectKernelTunables=true/a ProtectControlGroups=true' /usr/lib/systemd/system/php"${PHP_VERSION}"-fpm.service
-        sed -i '/ProtectControlGroups=true/a RestrictRealtime=true' /usr/lib/systemd/system/php"${PHP_VERSION}"-fpm.service
-        sed -i '/RestrictRealtime=true/a RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX' /usr/lib/systemd/system/php"${PHP_VERSION}"-fpm.service
-        systemctl daemon-reload
-    fi
-
-    if [[ -f "/lib/systemd/system/php${PHP_VERSION}-fpm.service" && ! -f "/usr/lib/systemd/system/php${PHP_VERSION}-fpm.service" ]]; then
-        sed -i '/ExecReload=/a LimitNOFILE=65535' /lib/systemd/system/php"${PHP_VERSION}"-fpm.service
-        sed -i '/ExecReload=/a LimitMEMLOCK=infinity' /lib/systemd/system/php"${PHP_VERSION}"-fpm.service
-        sed -i '/LimitNOFILE=65535/a PrivateTmp=true' /lib/systemd/system/php"${PHP_VERSION}"-fpm.service
-        sed -i '/PrivateTmp=true/a ProtectKernelModules=true' /lib/systemd/system/php"${PHP_VERSION}"-fpm.service
-        sed -i '/ProtectKernelModules=true/a ProtectKernelTunables=true' /lib/systemd/system/php"${PHP_VERSION}"-fpm.service
-        sed -i '/ProtectKernelTunables=true/a ProtectControlGroups=true' /lib/systemd/system/php"${PHP_VERSION}"-fpm.service
-        sed -i '/ProtectControlGroups=true/a RestrictRealtime=true' /lib/systemd/system/php"${PHP_VERSION}"-fpm.service
-        sed -i '/RestrictRealtime=true/a RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX' /lib/systemd/system/php"${PHP_VERSION}"-fpm.service
-        systemctl daemon-reload
-    fi
-
+    systemctl daemon-reload
     update-alternatives --set php /usr/bin/php"${PHP_VERSION}"
 }
 
@@ -453,104 +432,77 @@ install_php_2() {
         php"${PHP_VERSION_2}"-mbstring php"${PHP_VERSION_2}"-common php"${PHP_VERSION_2}"-soap \
         php"${PHP_VERSION_2}"-curl php"${PHP_VERSION_2}"-bcmath php"${PHP_VERSION_2}"-snmp php"${PHP_VERSION_2}"-pspell \
         php"${PHP_VERSION_2}"-gmp php"${PHP_VERSION_2}"-intl php"${PHP_VERSION_2}"-imap php"${PHP_VERSION_2}"-enchant \
-        php"${PHP_VERSION_2}"-xmlrpc php"${PHP_VERSION_2}"-tidy php"${PHP_VERSION_2}"-opcache php"${PHP_VERSION_2}"-cli \
-        php"${PHP_VERSION_2}"-dev php"${PHP_VERSION_2}"-imagick php"${PHP_VERSION_2}"-sqlite3
+        php"${PHP_VERSION_2}"-tidy php"${PHP_VERSION_2}"-opcache php"${PHP_VERSION_2}"-dev php"${PHP_VERSION_2}"-imagick \
+        php"${PHP_VERSION_2}"-sqlite3
 
-    if [ "${PHP_VERSION_2}" != "8.0" ]; then
-        apt -y install php"${PHP_VERSION_2}"-json
-    fi
+    # Tạo override systemd để harden php-fpm
+    mkdir -p /etc/systemd/system/php${PHP_VERSION_2}-fpm.service.d
+    cat > /etc/systemd/system/php${PHP_VERSION_2}-fpm.service.d/override.conf <<EOF
+[Service]
+LimitNOFILE=65535
+LimitMEMLOCK=infinity
+PrivateTmp=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+EOF
 
-    if [ "${PHP_VERSION_2}" == "5.6" ]; then
-        apt -y install php5.6-mcrypt
-    fi
-
+    systemctl daemon-reload
     PHP2_RELEASE="yes"
-    if [ -f "/usr/lib/systemd/system/php${PHP_VERSION_2}-fpm.service" ]; then
-        sed -i '/ExecReload=/a LimitNOFILE=65535' /usr/lib/systemd/system/php"${PHP_VERSION_2}"-fpm.service
-        sed -i '/ExecReload=/a LimitMEMLOCK=infinity' /usr/lib/systemd/system/php"${PHP_VERSION_2}"-fpm.service
-        sed -i '/LimitNOFILE=65535/a PrivateTmp=true' /usr/lib/systemd/system/php"${PHP_VERSION_2}"-fpm.service
-        sed -i '/PrivateTmp=true/a ProtectKernelModules=true' /usr/lib/systemd/system/php"${PHP_VERSION_2}"-fpm.service
-        sed -i '/ProtectKernelModules=true/a ProtectKernelTunables=true' /usr/lib/systemd/system/php"${PHP_VERSION_2}"-fpm.service
-        sed -i '/ProtectKernelTunables=true/a ProtectControlGroups=true' /usr/lib/systemd/system/php"${PHP_VERSION_2}"-fpm.service
-        sed -i '/ProtectControlGroups=true/a RestrictRealtime=true' /usr/lib/systemd/system/php"${PHP_VERSION_2}"-fpm.service
-        sed -i '/RestrictRealtime=true/a RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX' /usr/lib/systemd/system/php"${PHP_VERSION_2}"-fpm.service
-        systemctl daemon-reload
-    fi
-
-    if [[ -f "/lib/systemd/system/php${PHP_VERSION_2}-fpm.service" && ! -f "/usr/lib/systemd/system/php${PHP_VERSION_2}-fpm.service" ]]; then
-        sed -i '/ExecReload=/a LimitNOFILE=65535' /lib/systemd/system/php"${PHP_VERSION_2}"-fpm.service
-        sed -i '/ExecReload=/a LimitMEMLOCK=infinity' /lib/systemd/system/php"${PHP_VERSION_2}"-fpm.service
-        sed -i '/LimitNOFILE=65535/a PrivateTmp=true' /lib/systemd/system/php"${PHP_VERSION_2}"-fpm.service
-        sed -i '/PrivateTmp=true/a ProtectKernelModules=true' /lib/systemd/system/php"${PHP_VERSION_2}"-fpm.service
-        sed -i '/ProtectKernelModules=true/a ProtectKernelTunables=true' /lib/systemd/system/php"${PHP_VERSION_2}"-fpm.service
-        sed -i '/ProtectKernelTunables=true/a ProtectControlGroups=true' /lib/systemd/system/php"${PHP_VERSION_2}"-fpm.service
-        sed -i '/ProtectControlGroups=true/a RestrictRealtime=true' /lib/systemd/system/php"${PHP_VERSION_2}"-fpm.service
-        sed -i '/RestrictRealtime=true/a RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX' /lib/systemd/system/php"${PHP_VERSION_2}"-fpm.service
-        systemctl daemon-reload
-    fi
 }
 
 install_phpmyadmin() {
-    if [ "${PHP_VERSION}" == "5.6" ]; then
-        PHPMYADMIN_VERSION=$(curl -s ${UPDATE_LINK}/version | grep "phpmyadmin4_version=" | cut -f2 -d'=')
-    fi
-
-    if [ "${PHP_VERSION}" != "5.6" ]; then
-        DECLARE="declare(strict_types=1);"
-    fi
     if [ -f "${DEFAULT_DIR_TOOL}" ]; then
         rm -rf "${DEFAULT_DIR_TOOL}"
     fi
-    if [ ! -d "${DEFAULT_DIR_TOOL}" ]; then
-        mkdir -p "${DEFAULT_DIR_TOOL}"
-    fi
+    mkdir -p "${DEFAULT_DIR_TOOL}"
     cd_dir "${DEFAULT_DIR_TOOL}"
 
-    wget -O- https://files.phpmyadmin.net/phpMyAdmin/"${PHPMYADMIN_VERSION}"/phpMyAdmin-"${PHPMYADMIN_VERSION}"-all-languages.tar.gz | tar -xz
+    # Lấy phiên bản phpMyAdmin từ file version
+    PHPMYADMIN_VERSION=$(curl -s ${UPDATE_LINK}/version | grep "phpmyadmin_version=" | cut -f2 -d'=')
 
-    mv phpMyAdmin-"${PHPMYADMIN_VERSION}"-all-languages phpmyadmin
-    #rm -rf phpMyAdmin-"${PHPMYADMIN_VERSION}"-all-languages.zip
-    rm -rf "${DEFAULT_DIR_TOOL}"/phpmyadmin/setup
+    wget -O- https://files.phpmyadmin.net/phpMyAdmin/${PHPMYADMIN_VERSION}/phpMyAdmin-${PHPMYADMIN_VERSION}-all-languages.tar.gz | tar -xz
+    mv phpMyAdmin-${PHPMYADMIN_VERSION}-all-languages phpmyadmin
 
-    mv "${DEFAULT_DIR_TOOL}"/phpmyadmin/config.sample.inc.php "${DEFAULT_DIR_TOOL}"/phpmyadmin/config.inc.php
+    rm -rf phpmyadmin/setup
 
     BLOWFISH_SECRET=$(random_string 64)
-    mkdir -p "${DEFAULT_DIR_TOOL}"/phpmyadmin/tmp
+    mkdir -p phpmyadmin/tmp
 
-    cat >"${DEFAULT_DIR_TOOL}/phpmyadmin/config.inc.php" <<EOCONFIGINC
+    cat > phpmyadmin/config.inc.php <<EOCONFIGINC
 <?php
-${DECLARE}
 \$cfg['blowfish_secret'] = '${BLOWFISH_SECRET}';
-\$i = 0;
-\$i++;
+\$i = 1;
 \$cfg['Servers'][\$i]['auth_type'] = 'cookie';
 \$cfg['Servers'][\$i]['host'] = 'localhost';
 \$cfg['Servers'][\$i]['connect_type'] = 'tcp';
 \$cfg['Servers'][\$i]['compress'] = false;
 \$cfg['Servers'][\$i]['AllowNoPassword'] = false;
+\$cfg['Servers'][\$i]['extension'] = 'mysqli';
 \$cfg['UploadDir'] = '';
 \$cfg['SaveDir'] = '';
 \$cfg['PmaNoRelation_DisableWarning'] = true;
 \$cfg['VersionCheck'] = false;
 \$cfg['TempDir'] = '${DEFAULT_DIR_TOOL}/phpmyadmin/tmp';
-\$cfg['CaptchaLoginPublicKey'] = '';
-\$cfg['CaptchaLoginPrivateKey'] = '';
 \$cfg['ExecTimeLimit'] = 600;
-\$cfg['DefaultCharset'] = 'utf8';
-\$cfg['DefaultConnectionCollation'] = 'utf8_general_ci';
+\$cfg['DefaultCharset'] = 'utf8mb4';
+\$cfg['DefaultConnectionCollation'] = 'utf8mb4_general_ci';
 EOCONFIGINC
 
-    chown -R nginx:nginx "${DEFAULT_DIR_TOOL}"/phpmyadmin
-    chown -R nginx:nginx "${DEFAULT_DIR_TOOL}"/phpmyadmin
+    chown -R nginx:nginx phpmyadmin
 
-    cat >> "/opt/phpmyadmin.temp" <<EOphpmyadmin_temp
+    # Tạo DB phpmyadmin
+    cat > /opt/phpmyadmin.temp <<EOsql
 CREATE DATABASE IF NOT EXISTS phpmyadmin;
 FLUSH PRIVILEGES;
-EOphpmyadmin_temp
+EOsql
 
     mariadb -u root -p"${sql_root_pass}" < /opt/phpmyadmin.temp
     rm -f /opt/phpmyadmin.temp
 
+    # Download và import cấu trúc bảng phpmyadmin
     curl -o phpmyadmin.sql "${EXT_LINK}"/phpmyadmin.sql
     mariadb -u root -p"${sql_root_pass}" phpmyadmin < phpmyadmin.sql
     rm -rf phpmyadmin.sql
@@ -560,12 +512,10 @@ EOphpmyadmin_temp
 # Install Composer
 ############################################
 install_composer() {
-    curl -sS https://getcomposer.org/installer | php
-    mv composer.phar /usr/local/bin/composer
-    # Composer 1
-    wget https://getcomposer.org/download/2.8.8/composer.phar
-    mv composer.phar /usr/local/bin/composer1
-    chmod +x /usr/local/bin/composer1
+    php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+    php composer-setup.php --install-dir=/usr/local/bin --filename=composer
+    php -r "unlink('composer-setup.php');"
+    chmod +x /usr/local/bin/composer
 }
 
 ############################################
@@ -573,8 +523,16 @@ install_composer() {
 ############################################
 install_wp_cli() {
     curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
-    chmod +x wp-cli.phar
+    curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar.asc
+
+    # Import key của WP-CLI
+    gpg --keyserver keyserver.ubuntu.com --recv-keys 63D7264E
+    gpg --verify wp-cli.phar.asc wp-cli.phar
+
     mv wp-cli.phar /usr/local/bin/wp
+    chmod +x /usr/local/bin/wp
+
+    rm -f wp-cli.phar.asc
 }
 
 ############################################
@@ -999,15 +957,26 @@ install_pngquant(){
 ############################################
 # Config SSL
 self_signed_ssl() {
-    #Create dhparams
     self_signed_dir="/etc/nginx/ssl/server"
     mkdir -p "${self_signed_dir}"
-    openssl dhparam -out /etc/nginx/ssl/dhparams.pem 2048
-    openssl genrsa -out "${self_signed_dir}/server.key" 4096
+
+    # Tạo DH params (4096-bit để mạnh hơn, có thể thay bằng ffdhe4096 chuẩn)
+    openssl dhparam -out /etc/nginx/ssl/dhparams.pem 4096
+
+    # Tạo private key (OpenSSL 3.x chuẩn)
+    openssl genpkey -algorithm RSA -out "${self_signed_dir}/server.key" -pkeyopt rsa_keygen_bits:4096
+
+    # Tạo CSR với SAN
     openssl req -new -key "${self_signed_dir}/server.key" \
-        -out "${self_signed_dir}/server.csr" -subj "/C=VN/ST=Caugiay/L=Hanoi/O=Hostvn/OU=IT Department/CN=${IPADDRESS}"
-    openssl x509 -in "${self_signed_dir}/server.csr" -out "${self_signed_dir}/server.crt" \
-        -req -signkey "${self_signed_dir}/server.key" -days 3650
+        -out "${self_signed_dir}/server.csr" \
+        -subj "/C=VN/ST=Caugiay/L=Hanoi/O=Hostvn/OU=IT Department/CN=${IPADDRESS}" \
+        -addext "subjectAltName = IP:${IPADDRESS}"
+
+    # Tạo chứng chỉ tự ký (10 năm)
+    openssl x509 -req -in "${self_signed_dir}/server.csr" \
+        -signkey "${self_signed_dir}/server.key" \
+        -out "${self_signed_dir}/server.crt" -days 3650 \
+        -extfile <(printf "subjectAltName=IP:${IPADDRESS}")
 }
 
 # Config Nginx
@@ -1086,7 +1055,7 @@ http {
     limit_req_zone \$binary_remote_addr zone=req_limit_per_ip:10m rate=1r/s;
 
     # Custom Response Headers
-    more_set_headers 'Server: HOSTVN.NET';
+    more_set_headers 'Server: Nginx';
     more_set_headers 'X-Content-Type-Options    "nosniff" always';
     more_set_headers 'X-XSS-Protection          "1; mode=block" always';
     more_set_headers 'Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always';
@@ -2089,7 +2058,7 @@ default_index() {
             <h1>We'll be back soon!</h1>
             <div>
                 <p>Sorry for the inconvenience but we're performing some maintenance at the moment. If you need to you can always
-                <a href="mailto:${ADMIN_EMAIL}">contact us</a>, otherwise we'll be back online shortly!</p>
+                contact us, otherwise we'll be back online shortly!</p>
             </div>
         </article>
     </body>
@@ -2134,10 +2103,20 @@ EOdefault_index
 
 wp_rocket_nginx() {
     cd_dir /etc/nginx
-    git clone https://github.com/satellitewp/rocket-nginx.git
-    cd_dir /etc/nginx/rocket-nginx
-    cp rocket-nginx.ini.disabled rocket-nginx.ini
-    php rocket-parser.php
+
+    if [ -d "/etc/nginx/rocket-nginx" ]; then
+        cd_dir /etc/nginx/rocket-nginx
+        git pull
+    else
+        git clone https://github.com/satellitewp/rocket-nginx.git
+        cd_dir /etc/nginx/rocket-nginx
+    fi
+
+    if [ ! -f rocket-nginx.ini ]; then
+        cp rocket-nginx.ini.disabled rocket-nginx.ini
+    fi
+
+    php rocket-parser.php > /etc/nginx/rocket-nginx.conf
 }
 
 # Config PHP-FPM
@@ -2617,7 +2596,12 @@ change_ssh_port() {
 # Install ACME
 ############################################
 install_acme() {
-    curl https://get.acme.sh | sh -s email="${ADMIN_EMAIL}"
+    curl -sSL https://get.acme.sh | sh -s -- --accountemail "${ADMIN_EMAIL}"
+
+    # Tạo symlink để dễ gọi acme.sh
+    if [ -f "/root/.acme.sh/acme.sh" ]; then
+        ln -sf /root/.acme.sh/acme.sh /usr/local/bin/acme.sh
+    fi
 }
 
 ############################################
@@ -2650,7 +2634,9 @@ opcache_dashboard() {
 # Rclone
 ############################################
 install_rclone() {
-    curl https://rclone.org/install.sh | sudo bash
+    curl -sSL https://rclone.org/install.sh -o /tmp/rclone-install.sh
+    bash /tmp/rclone-install.sh
+    rm -f /tmp/rclone-install.sh
 }
 
 install_wp_cli_packages() {
