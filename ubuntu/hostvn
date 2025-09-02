@@ -305,7 +305,7 @@ install_nginx(){
 	cd_dir "${MODULE_PATH}"
     wget -O- https://nginx.org/download/nginx-"${NGINX_VERSION}".tar.gz | tar -xz
 	wget -O- https://github.com/FRiCKLE/ngx_cache_purge/archive/refs/tags/"${ngx_cache_purge_version}".tar.gz | tar -xz
-	wget -O- https://github.com/openssl/openssl/archive/refs/tags/OpenSSL_"${openssl_version}".tar.gz | tar -xz
+    wget -O- https://github.com/openssl/openssl/archive/refs/tags/openssl-"${openssl_version}".tar.gz | tar -xz
 	wget -O- https://github.com/PCRE2Project/pcre2/releases/download/pcre2-"${pcre_version}"/pcre2-"${pcre_version}".tar.gz | tar -xz
 	wget -O- https://github.com/madler/zlib/releases/download/v"${zlib_version}"/zlib-"${zlib_version}".tar.gz | tar -xz
 	wget -O- https://github.com/openresty/headers-more-nginx-module/archive/refs/tags/v"${more_clear_headers_v}".tar.gz | tar -xz
