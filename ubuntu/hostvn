@@ -379,8 +379,6 @@ EOnginx_service
 }
 
 install_mariadb() {
-    export DEBIAN_FRONTEND=noninteractive
-
     apt-get update
     apt-get install -y software-properties-common wget ca-certificates gnupg lsb-release
 
@@ -394,7 +392,6 @@ install_mariadb() {
     systemctl enable mariadb
     systemctl start mariadb
 }
-
 
 install_php() {
     add-apt-repository -y ppa:ondrej/php
