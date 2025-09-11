@@ -12,7 +12,9 @@
 ######################################################################
 
 OS_VER=$(grep -w "VERSION_ID=" "/etc/os-release" | cut -f2 -d'=' | cut -f2 -d'"')
-LIST_OS_VER_SUPPORT=('20.04' '22.04' '24.04')
+LIST_OS_VER_SUPPORT=('22.04' '24.04')
+ARCH=$(uname -m)
+
 rm -rf ubuntu
 
 DIR=$(pwd)
@@ -90,43 +92,42 @@ set_dns_server(){
 }
 
 create_source_list(){
-    if [ "${OS_VER}" == "20.04" ]; then
-        mv /etc/apt/sources.list /etc/apt/sources.list."$(date +%Y-%m-%d)"
-        cat >> "/etc/apt/sources.list" << EOsource_list
-deb http://archive.ubuntu.com/ubuntu/ focal main restricted
-deb http://archive.ubuntu.com/ubuntu/ focal-updates main restricted
-deb http://archive.ubuntu.com/ubuntu/ focal universe
-deb http://archive.ubuntu.com/ubuntu/ focal-updates universe
-deb http://archive.ubuntu.com/ubuntu/ focal-updates multiverse
-deb http://archive.ubuntu.com/ubuntu/ focal multiverse
-deb http://archive.ubuntu.com/ubuntu/ focal-backports main restricted universe multiverse
-deb http://security.ubuntu.com/ubuntu focal-security main restricted
-deb http://security.ubuntu.com/ubuntu focal-security universe
-deb http://security.ubuntu.com/ubuntu focal-security multiverse
-EOsource_list
-
-        apt update -y
-    fi
     if [ "${OS_VER}" == "22.04" ]; then
         mv /etc/apt/sources.list /etc/apt/sources.list."$(date +%Y-%m-%d)"
-        cat >> "/etc/apt/sources.list" << EOsource_list
+        if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
+cat >> "/etc/apt/sources.list" << EOsource_list
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-backports main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse
+EOsource_list
+        else
+cat >> "/etc/apt/sources.list" << EOsource_list
 deb http://archive.ubuntu.com/ubuntu jammy main restricted universe multiverse
 deb http://archive.ubuntu.com/ubuntu jammy-updates main restricted universe multiverse
 deb http://archive.ubuntu.com/ubuntu jammy-backports main restricted universe multiverse
 deb http://security.ubuntu.com/ubuntu jammy-security main restricted universe multiverse
 EOsource_list
-
+        fi
         apt update -y
     fi
     if [ "${OS_VER}" == "24.04" ]; then
         mv /etc/apt/sources.list /etc/apt/sources.list."$(date +%Y-%m-%d)"
-        cat >> "/etc/apt/sources.list" << EOsource_list
+        if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
+cat >> "/etc/apt/sources.list" << EOsource_list
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-updates main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-backports main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-security main restricted universe multiverse
+EOsource_list
+        else
+cat >> "/etc/apt/sources.list" << EOsource_list
 deb http://archive.ubuntu.com/ubuntu noble main restricted universe multiverse
 deb http://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
 deb http://archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse
 deb http://security.ubuntu.com/ubuntu noble-security main restricted universe multiverse
 EOsource_list
-
+        fi
         apt update -y
     fi
 }
@@ -220,4 +221,3 @@ else
     printf "${RED}%s${NC}" "Huy cai dat."
     exit
 fi
-
