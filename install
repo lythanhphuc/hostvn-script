@@ -1,13 +1,12 @@
 #!/bin/bash
 
 ######################################################################
-#           Auto Install & Optimize LEMP Stack on Ubuntu/centOS      #
-#                                                                    #
-#                Author: Sanvv - HOSTVN Technical                    #
-#                  Website: https://hostvn.vn                        #
-#                                                                    #
-#              Please do not remove copyright. Thank!                #
-#  Please do not copy under any circumstance for commercial reason!  #
+# Auto Install & Optimize LEMP Stack on Ubuntu/centOS #
+# Author: Sanvv - HOSTVN Technical                      #
+# Website: https://hostvn.vn                            #
+#                                                         #
+# Vui lòng không xóa copyright. Cảm ơn!                 #
+# Không được sao chép thương mại!                       #
 ######################################################################
 
 rm -rf install
@@ -17,6 +16,8 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 OS=$(grep -oP '(?<=^ID=).+' /etc/os-release | tr -d '"')
+OS_VER=$(grep -w "VERSION_ID=" "/etc/os-release" | cut -f2 -d'=' | cut -f2 -d'"')
+ARCH=$(uname -m)
 
 SCRIPT_LINK="https://raw.githubusercontent.com/lythanhphuc/hostvn-script/master/${OS}"
 OS_LIST="centos ubuntu debian almalinux"
@@ -52,45 +53,48 @@ export LC_ALL="en_US.UTF-8"
 export LC_CTYPE="en_US.UTF-8"
 
 create_source_list(){
-    if [[ "$OS" == 'ubuntu' && "${OS_VER}" == "20.04" ]]; then
-        mv /etc/apt/sources.list /etc/apt/sources.list."$(date +%Y-%m-%d)"
-        cat >> "/etc/apt/sources.list" << EOsource_list
-deb http://archive.ubuntu.com/ubuntu/ focal main restricted
-deb http://archive.ubuntu.com/ubuntu/ focal-updates main restricted
-deb http://archive.ubuntu.com/ubuntu/ focal universe
-deb http://archive.ubuntu.com/ubuntu/ focal-updates universe
-deb http://archive.ubuntu.com/ubuntu/ focal-updates multiverse
-deb http://archive.ubuntu.com/ubuntu/ focal multiverse
-deb http://archive.ubuntu.com/ubuntu/ focal-backports main restricted universe multiverse
-deb http://security.ubuntu.com/ubuntu focal-security main restricted
-deb http://security.ubuntu.com/ubuntu focal-security universe
-deb http://security.ubuntu.com/ubuntu focal-security multiverse
-EOsource_list
+    # Kiểm tra kiến trúc hệ thống
+    ARCH=$(uname -m)
 
-        apt update -y
-    fi
-	if [[ "$OS" == 'ubuntu' && "${OS_VER}" == "22.04" ]]; then
-		mv /etc/apt/sources.list /etc/apt/sources.list."$(date +%Y-%m-%d)"
-		cat >> "/etc/apt/sources.list" << EOsource_list
+    if [[ "$OS" == 'ubuntu' && "${OS_VER}" == "22.04" ]]; then
+        mv /etc/apt/sources.list /etc/apt/sources.list."$(date +%Y-%m-%d)"
+        if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
+cat >> "/etc/apt/sources.list" << EOsource_list
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-backports main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse
+EOsource_list
+        else
+cat >> "/etc/apt/sources.list" << EOsource_list
 deb http://archive.ubuntu.com/ubuntu jammy main restricted universe multiverse
 deb http://archive.ubuntu.com/ubuntu jammy-updates main restricted universe multiverse
 deb http://archive.ubuntu.com/ubuntu jammy-backports main restricted universe multiverse
 deb http://security.ubuntu.com/ubuntu jammy-security main restricted universe multiverse
 EOsource_list
+        fi
+        apt update -y
+    fi
 
-    apt update -y
-	fi
-	if [[ "$OS" == 'ubuntu' && "${OS_VER}" == "24.04" ]]; then
-		mv /etc/apt/sources.list /etc/apt/sources.list."$(date +%Y-%m-%d)"
-		cat >> "/etc/apt/sources.list" << EOsource_list
+    if [[ "$OS" == 'ubuntu' && "${OS_VER}" == "24.04" ]]; then
+        mv /etc/apt/sources.list /etc/apt/sources.list."$(date +%Y-%m-%d)"
+        if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
+cat >> "/etc/apt/sources.list" << EOsource_list
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-updates main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-backports main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-security main restricted universe multiverse
+EOsource_list
+        else
+cat >> "/etc/apt/sources.list" << EOsource_list
 deb http://archive.ubuntu.com/ubuntu noble main restricted universe multiverse
 deb http://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
 deb http://archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse
 deb http://security.ubuntu.com/ubuntu noble-security main restricted universe multiverse
 EOsource_list
-
-    apt update -y
-fi
+        fi
+        apt update -y
+    fi
 }
 
 if [[ "$(id -u)" != "0" ]]; then
@@ -123,15 +127,6 @@ if [[ -f "/var/hostvn/.hostvn.conf" ]]; then
     exit
 fi
 
-OS_VER=$(grep -w "VERSION_ID=" "/etc/os-release" | cut -f2 -d'=' | cut -f2 -d'"')
-
-# if [ ${OS_VER} == '8' ]; then
-#     printf "${RED}%s${NC}\n" "Hien tai centOS 8 da khong con duoc cong ty RHEL ho tro phat trien phien ban on dinh. Vui long su dung phien ban Ubuntu 22.04 hoac 24.04"
-#     printf "%s\n" "${RED}De biet them thong tin ban co the search Google voi tu khoa:${NC} centOS is Dead"
-#     printf "${RED}%s${NC}\n" "Huy cai dat."
-#     exit 0
-# fi
-
 if [[ " ${OS_LIST[*]} " == *" ${OS} "* ]]; then
     prompt_install="y"
     if [[ "${OS}" == "centos" ]]; then
@@ -140,18 +135,6 @@ if [[ " ${OS_LIST[*]} " == *" ${OS} "* ]]; then
         printf "${RED}%s${NC}\n" "De VPS hoat dong on dinh khuyen nghi ban nen cai dat ban Ubuntu (22.04, 24.04) thay vi su dung ban centOS."
         printf "%s\n" "${RED}Huy cai dat.${NC}"
         exit
-
-        # while true
-        # do
-        #     read -r -p "Ban co muon tiep tuc cai dat khong ? (y/n) " prompt_install
-        #     echo
-        #     if [[ "${prompt_install}" =~ ^([yY])$ || "${prompt_install}" =~ ^([nN])$ ]]; then
-        #         break
-        #     else
-        #         printf "%s\n" "${RED}Huy cai dat.${NC}"
-        #         exit
-        #     fi
-        # done
     fi
 
     if [[ "${prompt_install}" =~ ^([yY])$ ]]; then
