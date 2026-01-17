@@ -1,3 +1,4 @@
+
 #!/bin/bash
 
 ######################################################################
@@ -116,6 +117,7 @@ create_bash_dir() {
     chmod 711 /home
     mkdir -p "${BASH_DIR}"
     mkdir -p "${BASH_DIR}"/custom
+	mkdir -p "${DEFAULT_DIR_TOOL}"
 }
 
 # Admin Email
@@ -486,7 +488,7 @@ EOF
 install_phpmyadmin() {
     export DEBIAN_FRONTEND=noninteractive
 
-    if [ -d "${DEFAULT_DIR_TOOL}" ]; then
+    if [ -f "${DEFAULT_DIR_TOOL}" ]; then
         rm -rf "${DEFAULT_DIR_TOOL}"
     fi
     mkdir -p "${DEFAULT_DIR_TOOL}"
