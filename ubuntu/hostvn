@@ -385,15 +385,18 @@ install_mariadb() {
     systemctl restart mariadb
 }
 
+add_php_repo() {
+    apt-get update -y
+    apt-get install -y software-properties-common ca-certificates lsb-release
+
+    add-apt-repository -y ppa:ondrej/php
+    apt-get update -y
+}
+
 install_php() {
     export DEBIAN_FRONTEND=noninteractive
 
     echo "=== Cai dat PHP ${PHP_VERSION} ==="
-
-    apt-get update -y
-    apt-get install -y ca-certificates gnupg apt-transport-https
-
-    apt-get update -y
 
     apt-get install -y \
         php${PHP_VERSION} \
@@ -415,21 +418,18 @@ install_php() {
         php${PHP_VERSION}-ldap \
         php${PHP_VERSION}-imagick \
         php${PHP_VERSION}-tidy \
-        php${PHP_VERSION}-gmp
+        php${PHP_VERSION}-gmp || {
+            echo "❌ PHP ${PHP_VERSION} khong ton tai trong repo"
+            exit 1
+        }
 
-    # Harden php-fpm (an toan cho 24.04)
-    mkdir -p /etc/systemd/system/php${PHP_VERSION}-fpm.service.d
-    cat > /etc/systemd/system/php${PHP_VERSION}-fpm.service.d/override.conf <<EOF
-[Service]
-LimitNOFILE=65535
-PrivateTmp=true
-ProtectSystem=full
-ProtectHome=true
-NoNewPrivileges=true
-EOF
+    # kiểm tra path tồn tại
+    PHP_ETC="/etc/php/${PHP_VERSION}/fpm"
+    [[ ! -d "$PHP_ETC" ]] && {
+        echo "❌ Khong tim thay $PHP_ETC"
+        exit 1
+    }
 
-    systemctl daemon-reexec
-    systemctl daemon-reload
     systemctl enable php${PHP_VERSION}-fpm
     systemctl restart php${PHP_VERSION}-fpm
 
@@ -583,63 +583,63 @@ php_memory_calculation() {
     # PHP_MEM tinh theo KB
     if [[ "${PHP_MEM}" -le 262144 ]]; then
         OPCACHE_MEM=128
-        MAX_MEMORY=128
+        [[ -z "$MAX_MEMORY" ]] && MAX_MEMORY=128
         PHP_REAL_PATH_LIMIT='512k'
         PHP_REAL_PATH_TTL=14400
         MAX_INPUT_VARS=6000
 
     elif [[ "${PHP_MEM}" -le 393216 ]]; then
         OPCACHE_MEM=128
-        MAX_MEMORY=128
+        [[ -z "$MAX_MEMORY" ]] && MAX_MEMORY=128
         PHP_REAL_PATH_LIMIT='640k'
         PHP_REAL_PATH_TTL=21600
         MAX_INPUT_VARS=6000
 
     elif [[ "${PHP_MEM}" -le 524288 ]]; then
         OPCACHE_MEM=128
-        MAX_MEMORY=128
+        [[ -z "$MAX_MEMORY" ]] && MAX_MEMORY=128
         PHP_REAL_PATH_LIMIT='768k'
         PHP_REAL_PATH_TTL=21600
         MAX_INPUT_VARS=6000
 
     elif [[ "${PHP_MEM}" -le 1048576 ]]; then   # 1GB
         OPCACHE_MEM=192
-        MAX_MEMORY=192
+        [[ -z "$MAX_MEMORY" ]] && MAX_MEMORY=192
         PHP_REAL_PATH_LIMIT='1024k'
         PHP_REAL_PATH_TTL=28800
         MAX_INPUT_VARS=6000
 
     elif [[ "${PHP_MEM}" -le 2097152 ]]; then   # 2GB
         OPCACHE_MEM=256
-        MAX_MEMORY=256
+        [[ -z "$MAX_MEMORY" ]] && MAX_MEMORY=256
         PHP_REAL_PATH_LIMIT='2048k'
         PHP_REAL_PATH_TTL=43200
         MAX_INPUT_VARS=8000
 
     elif [[ "${PHP_MEM}" -le 4194304 ]]; then   # 4GB
         OPCACHE_MEM=384
-        MAX_MEMORY=384
+        [[ -z "$MAX_MEMORY" ]] && MAX_MEMORY=384
         PHP_REAL_PATH_LIMIT='4096k'
         PHP_REAL_PATH_TTL=43200
         MAX_INPUT_VARS=10000
 
     elif [[ "${PHP_MEM}" -le 8388608 ]]; then   # 8GB
         OPCACHE_MEM=512
-        MAX_MEMORY=512
+        [[ -z "$MAX_MEMORY" ]] && MAX_MEMORY=512
         PHP_REAL_PATH_LIMIT='4096k'
         PHP_REAL_PATH_TTL=43200
         MAX_INPUT_VARS=10000
 
     elif [[ "${PHP_MEM}" -le 16777216 ]]; then  # 16GB
         OPCACHE_MEM=640
-        MAX_MEMORY=768
+        [[ -z "$MAX_MEMORY" ]] && MAX_MEMORY=768
         PHP_REAL_PATH_LIMIT='8192k'
         PHP_REAL_PATH_TTL=86400
         MAX_INPUT_VARS=10000
 
     else                                        # >16GB
         OPCACHE_MEM=768
-        MAX_MEMORY=1024
+        [[ -z "$MAX_MEMORY" ]] && MAX_MEMORY=1024
         PHP_REAL_PATH_LIMIT='8192k'
         PHP_REAL_PATH_TTL=86400
         MAX_INPUT_VARS=10000
@@ -3531,6 +3531,7 @@ self_signed_ssl
 
 install_nginx
 install_mariadb
+add_php_repo
 install_php
 
 if [[ "${MULTI_PHP}" =~ ^(Y|y)$ ]]; then
