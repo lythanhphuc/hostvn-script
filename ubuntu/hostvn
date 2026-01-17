@@ -22,7 +22,7 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 SCRIPTS_VERSION="0.2.9"
-IPADDRESS=$(curl -s https://cyberpanel.sh/?ip)
+IPADDRESS=$(curl -s https://checkip.amazonaws.com)
 DIR=$(pwd)
 BASH_DIR="/var/hostvn"
 GITHUB_RAW_LINK="https://raw.githubusercontent.com"
