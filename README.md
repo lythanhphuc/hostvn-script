@@ -1,17 +1,15 @@
-<p align="center"><strong>Auto Install & Optimize LEMP Stack on Ubuntu (22.04, 24.04)</strong></p>
+<p align="center"><strong>Auto Install & Optimize LEMP Stack on Ubuntu 24.04</strong></p>
 <p align="center"><strong>Author: Sanvv - HOSTVN.NET Technical</strong></p>
 <p align="center"><strong>Home Page: <a href="https://hostvn.vn/">Hostvn Scripts Home page</a> , <a href="https://hostvn.net">Hostvn.net - Tên miền, Web Hosting, Email, VPS &amp; Dịch vụ lưu trữ Website</a></strong></p>
 <p align="center"><strong>Document: https://help.hostvn.vn/</strong></p>
 <p align="center"><strong>Groups Support: https://www.facebook.com/groups/hostvn.vn</strong></p>
-
-<p align="center"> <img src="https://blog.hostvn.net/wp-content/uploads/2020/07/logo-big-2.png" /> </p>
 
 > [!IMPORTANT]
 > Vì Ubuntu 20.04 không còn được hỗ trợ nên mình edit phiên bản này cơ bản để chạy được trên 24.04 và cập nhật thư viện lên phiên bản mới hơn, các lỗi của script vẫn còn đó vì mình không biết fix, chỉ nên dùng tạm thời trong lúc chờ tác giả ra bản mới.
 
 ########################################################################
 
-Script được viết bằng shell dùng để cài đặt LEMP Stack (Nginx - MariaDB - PHP-FPM) trên Ubuntu (22.04, 24.04).
+Script được viết bằng shell dùng để cài đặt LEMP Stack (Nginx - MariaDB - PHP-FPM) trên Ubuntu 24.04.
 
 <b>Vui lòng không sao chép, phát hành lại với mục đích thương mại, donate. Xin cảm ơn.</b>
 
@@ -35,7 +33,7 @@ curl -sO https://raw.githubusercontent.com/lythanhphuc/hostvn-script/master/inst
 - Mariadb: 11.8.
 - Phiên bản Nginx Stable.
 - Cho phép lựa chọn phiên bản PHP từ 5.6, đến 8.4
-- phpMyAdmin 4.9.x nếu cài đặt PHP mặc định là 5.6, phpMyAdmin 5.0.x nếu cài đặt PHP mặc định là 7.x.
+- phpMyAdmin 4.9.x nếu cài đặt PHP mặc định là 5.6, phpMyAdmin 5.2.x nếu cài đặt PHP mặc định là 8.x.
 - Cấu hình Nginx FastCGI cache
 - Cấu hình Nginx Pagespeed
 - Cài đặt PHPMemcachedAdmin, phpRedisAdmin, Opcache Dashboard.
