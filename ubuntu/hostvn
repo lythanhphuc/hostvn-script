@@ -41,6 +41,7 @@ PHPMYADMIN_VERSION=$(curl -s ${UPDATE_LINK}/version | grep "phpmyadmin_version="
 MARIADB_VERSION=$(curl -s ${UPDATE_LINK}/version | grep "mariadb_version=" | cut -f2 -d'=')
 # shellcheck disable=SC2207
 PHP_LIST=($(curl -s https://raw.githubusercontent.com/lythanhphuc/hostvn-script/master/ubuntu/update/version | grep "php_list=" | cut -f2 -d'='))
+DEFAULT_PHP="8.3"
 
 # Set Lang
 OPTION_CHANGE_SSH="Ban co muon thay doi port SSH khong ? "
@@ -290,18 +291,6 @@ install_nginx(){
     zlib_version=$(curl -s ${UPDATE_LINK}/version | grep "zlib_version=" | cut -f2 -d'=')
     nginx_module_vts_v=$(curl -s ${UPDATE_LINK}/version | grep "nginx_module_vts_v=" | cut -f2 -d'=')
 
-    # cd_dir "${MODULE_PATH}"
-
-    # wget -O- https://github.com/apache/incubator-pagespeed-ngx/archive/v"${NPS_VERSION}".tar.gz | tar -xz
-    # nps_dir=$(find . -name "*pagespeed-ngx-${NPS_VERSION}" -type d)
-    # cd_dir "$nps_dir"
-    # NPS_RELEASE_NUMBER=${NPS_VERSION/beta/}
-    # NPS_RELEASE_NUMBER=${NPS_VERSION/stable/}
-
-    # psol_url=https://dl.google.com/dl/page-speed/psol/${NPS_RELEASE_NUMBER}.tar.gz
-    # [ -e scripts/format_binary_url.sh ] && psol_url=$(scripts/format_binary_url.sh PSOL_BINARY_URL)
-    # wget -O- "${psol_url}" | tar -xz
-
 	cd_dir "${MODULE_PATH}"
     wget -O- https://nginx.org/download/nginx-"${NGINX_VERSION}".tar.gz | tar -xz
 	wget -O- https://github.com/FRiCKLE/ngx_cache_purge/archive/refs/tags/"${ngx_cache_purge_version}".tar.gz | tar -xz
@@ -310,11 +299,6 @@ install_nginx(){
 	wget -O- https://github.com/madler/zlib/releases/download/v"${zlib_version}"/zlib-"${zlib_version}".tar.gz | tar -xz
 	wget -O- https://github.com/openresty/headers-more-nginx-module/archive/refs/tags/v"${more_clear_headers_v}".tar.gz | tar -xz
     wget -O- https://github.com/vozlt/nginx-module-vts/archive/refs/tags/v"${nginx_module_vts_v}".tar.gz | tar -xz
-
-
-    #git clone --depth 1 https://github.com/google/ngx_brotli
-	#cd ngx_brotli || exit
-	#git submodule update --init
 
     cd_dir "${MODULE_PATH}"/nginx-"${NGINX_VERSION}"/
 
@@ -381,130 +365,187 @@ EOnginx_service
 install_mariadb() {
     export DEBIAN_FRONTEND=noninteractive
 
-    apt-get update
+    apt-get update -y
     apt-get install -y software-properties-common wget ca-certificates gnupg lsb-release
 
-    wget https://downloads.mariadb.com/MariaDB/mariadb_repo_setup -O mariadb_repo_setup
-    chmod +x mariadb_repo_setup
-    ./mariadb_repo_setup --mariadb-server-version="mariadb-${MARIADB_VERSION}"
+    if [ ! -f /usr/bin/mariadb ]; then
+        wget -qO mariadb_repo_setup https://downloads.mariadb.com/MariaDB/mariadb_repo_setup
+        chmod +x mariadb_repo_setup
 
-    apt-get update
-    apt-get install -y mariadb-server mariadb-backup
+        ./mariadb_repo_setup \
+            --mariadb-server-version="${MARIADB_VERSION}" \
+            --skip-maxscale \
+            --skip-tools
+
+        apt-get update -y
+        apt-get install -y mariadb-server
+    fi
 
     systemctl enable mariadb
-    systemctl start mariadb
+    systemctl restart mariadb
 }
 
 install_php() {
-    add-apt-repository -y ppa:ondrej/php
+    export DEBIAN_FRONTEND=noninteractive
+
+    echo "=== Cai dat PHP ${PHP_VERSION} ==="
+
+    apt-get update -y
+    apt-get install -y ca-certificates gnupg apt-transport-https
+
     apt-get update -y
 
-    apt-get -y install php"${PHP_VERSION}" php"${PHP_VERSION}"-fpm php"${PHP_VERSION}"-ldap php"${PHP_VERSION}"-zip \
-        php"${PHP_VERSION}"-cli php"${PHP_VERSION}"-mysql php"${PHP_VERSION}"-gd php"${PHP_VERSION}"-xml \
-        php"${PHP_VERSION}"-mbstring php"${PHP_VERSION}"-common php"${PHP_VERSION}"-soap \
-        php"${PHP_VERSION}"-curl php"${PHP_VERSION}"-bcmath php"${PHP_VERSION}"-snmp php"${PHP_VERSION}"-pspell \
-        php"${PHP_VERSION}"-gmp php"${PHP_VERSION}"-intl php"${PHP_VERSION}"-imap php"${PHP_VERSION}"-enchant \
-        php"${PHP_VERSION}"-tidy php"${PHP_VERSION}"-opcache php"${PHP_VERSION}"-dev php"${PHP_VERSION}"-imagick \
-        php"${PHP_VERSION}"-sqlite3
+    apt-get install -y \
+        php${PHP_VERSION} \
+        php${PHP_VERSION}-fpm \
+        php${PHP_VERSION}-cli \
+        php${PHP_VERSION}-common \
+        php${PHP_VERSION}-mysql \
+        php${PHP_VERSION}-gd \
+        php${PHP_VERSION}-xml \
+        php${PHP_VERSION}-mbstring \
+        php${PHP_VERSION}-curl \
+        php${PHP_VERSION}-zip \
+        php${PHP_VERSION}-bcmath \
+        php${PHP_VERSION}-intl \
+        php${PHP_VERSION}-imap \
+        php${PHP_VERSION}-soap \
+        php${PHP_VERSION}-sqlite3 \
+        php${PHP_VERSION}-opcache \
+        php${PHP_VERSION}-ldap \
+        php${PHP_VERSION}-imagick \
+        php${PHP_VERSION}-tidy \
+        php${PHP_VERSION}-gmp
 
-    # Tạo override systemd để harden php-fpm
+    # Harden php-fpm (an toan cho 24.04)
     mkdir -p /etc/systemd/system/php${PHP_VERSION}-fpm.service.d
     cat > /etc/systemd/system/php${PHP_VERSION}-fpm.service.d/override.conf <<EOF
 [Service]
 LimitNOFILE=65535
-LimitMEMLOCK=infinity
 PrivateTmp=true
-ProtectKernelModules=true
-ProtectKernelTunables=true
-ProtectControlGroups=true
-RestrictRealtime=true
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ProtectSystem=full
+ProtectHome=true
+NoNewPrivileges=true
 EOF
 
+    systemctl daemon-reexec
     systemctl daemon-reload
-    update-alternatives --set php /usr/bin/php"${PHP_VERSION}"
+    systemctl enable php${PHP_VERSION}-fpm
+    systemctl restart php${PHP_VERSION}-fpm
+
+    update-alternatives --set php /usr/bin/php${PHP_VERSION}
 }
 
 install_php_2() {
-    apt-get -y install php"${PHP_VERSION_2}" php"${PHP_VERSION_2}"-fpm php"${PHP_VERSION_2}"-ldap php"${PHP_VERSION_2}"-zip \
-        php"${PHP_VERSION_2}"-cli php"${PHP_VERSION_2}"-mysql php"${PHP_VERSION_2}"-gd php"${PHP_VERSION_2}"-xml \
-        php"${PHP_VERSION_2}"-mbstring php"${PHP_VERSION_2}"-common php"${PHP_VERSION_2}"-soap \
-        php"${PHP_VERSION_2}"-curl php"${PHP_VERSION_2}"-bcmath php"${PHP_VERSION_2}"-snmp php"${PHP_VERSION_2}"-pspell \
-        php"${PHP_VERSION_2}"-gmp php"${PHP_VERSION_2}"-intl php"${PHP_VERSION_2}"-imap php"${PHP_VERSION_2}"-enchant \
-        php"${PHP_VERSION_2}"-tidy php"${PHP_VERSION_2}"-opcache php"${PHP_VERSION_2}"-dev php"${PHP_VERSION_2}"-imagick \
-        php"${PHP_VERSION_2}"-sqlite3
+    export DEBIAN_FRONTEND=noninteractive
 
-    # Tạo override systemd để harden php-fpm
+    echo "=== Cai dat PHP phu ${PHP_VERSION_2} ==="
+
+    apt-get update -y
+
+    apt-get install -y \
+        php${PHP_VERSION_2} \
+        php${PHP_VERSION_2}-fpm \
+        php${PHP_VERSION_2}-cli \
+        php${PHP_VERSION_2}-common \
+        php${PHP_VERSION_2}-mysql \
+        php${PHP_VERSION_2}-gd \
+        php${PHP_VERSION_2}-xml \
+        php${PHP_VERSION_2}-mbstring \
+        php${PHP_VERSION_2}-curl \
+        php${PHP_VERSION_2}-zip \
+        php${PHP_VERSION_2}-bcmath \
+        php${PHP_VERSION_2}-intl \
+        php${PHP_VERSION_2}-imap \
+        php${PHP_VERSION_2}-soap \
+        php${PHP_VERSION_2}-sqlite3 \
+        php${PHP_VERSION_2}-opcache \
+        php${PHP_VERSION_2}-ldap \
+        php${PHP_VERSION_2}-imagick \
+        php${PHP_VERSION_2}-tidy \
+        php${PHP_VERSION_2}-gmp
+
+    # Harden php-fpm (an toan cho PHP phu)
     mkdir -p /etc/systemd/system/php${PHP_VERSION_2}-fpm.service.d
     cat > /etc/systemd/system/php${PHP_VERSION_2}-fpm.service.d/override.conf <<EOF
 [Service]
 LimitNOFILE=65535
-LimitMEMLOCK=infinity
 PrivateTmp=true
-ProtectKernelModules=true
-ProtectKernelTunables=true
-ProtectControlGroups=true
-RestrictRealtime=true
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ProtectSystem=full
+ProtectHome=true
+NoNewPrivileges=true
 EOF
 
+    systemctl daemon-reexec
     systemctl daemon-reload
+    systemctl enable php${PHP_VERSION_2}-fpm
+    systemctl restart php${PHP_VERSION_2}-fpm
+
     PHP2_RELEASE="yes"
 }
 
 install_phpmyadmin() {
-    if [ -f "${DEFAULT_DIR_TOOL}" ]; then
+    export DEBIAN_FRONTEND=noninteractive
+
+    if [ -d "${DEFAULT_DIR_TOOL}" ]; then
         rm -rf "${DEFAULT_DIR_TOOL}"
     fi
     mkdir -p "${DEFAULT_DIR_TOOL}"
     cd_dir "${DEFAULT_DIR_TOOL}"
 
-    # Lấy phiên bản phpMyAdmin từ file version
-    PHPMYADMIN_VERSION=$(curl -s ${UPDATE_LINK}/version | grep "phpmyadmin_version=" | cut -f2 -d'=')
+    # Lay phien ban phpMyAdmin tu server update
+    PHPMYADMIN_VERSION=$(curl -fsSL ${UPDATE_LINK}/version | grep "^phpmyadmin_version=" | cut -d'=' -f2)
 
-    wget -O- https://files.phpmyadmin.net/phpMyAdmin/${PHPMYADMIN_VERSION}/phpMyAdmin-${PHPMYADMIN_VERSION}-all-languages.tar.gz | tar -xz
+    if [ -z "${PHPMYADMIN_VERSION}" ]; then
+        echo "Khong lay duoc phien ban phpMyAdmin"
+        exit 1
+    fi
+
+    wget -qO- https://files.phpmyadmin.net/phpMyAdmin/${PHPMYADMIN_VERSION}/phpMyAdmin-${PHPMYADMIN_VERSION}-all-languages.tar.gz | tar -xz
     mv phpMyAdmin-${PHPMYADMIN_VERSION}-all-languages phpmyadmin
 
+    # Remove setup (bao mat)
     rm -rf phpmyadmin/setup
 
     BLOWFISH_SECRET=$(random_string 64)
     mkdir -p phpmyadmin/tmp
+    chmod 700 phpmyadmin/tmp
 
-    cat > phpmyadmin/config.inc.php <<EOCONFIGINC
+    cat > phpmyadmin/config.inc.php <<EOF
 <?php
 \$cfg['blowfish_secret'] = '${BLOWFISH_SECRET}';
 \$i = 1;
 \$cfg['Servers'][\$i]['auth_type'] = 'cookie';
-\$cfg['Servers'][\$i]['host'] = 'localhost';
+\$cfg['Servers'][\$i]['host'] = '127.0.0.1';
 \$cfg['Servers'][\$i]['connect_type'] = 'tcp';
 \$cfg['Servers'][\$i]['compress'] = false;
 \$cfg['Servers'][\$i]['AllowNoPassword'] = false;
 \$cfg['Servers'][\$i]['extension'] = 'mysqli';
+
 \$cfg['UploadDir'] = '';
 \$cfg['SaveDir'] = '';
+\$cfg['TempDir'] = '${DEFAULT_DIR_TOOL}/phpmyadmin/tmp';
+
 \$cfg['PmaNoRelation_DisableWarning'] = true;
 \$cfg['VersionCheck'] = false;
-\$cfg['TempDir'] = '${DEFAULT_DIR_TOOL}/phpmyadmin/tmp';
 \$cfg['ExecTimeLimit'] = 600;
 \$cfg['DefaultCharset'] = 'utf8mb4';
 \$cfg['DefaultConnectionCollation'] = 'utf8mb4_general_ci';
-EOCONFIGINC
+EOF
 
     chown -R nginx:nginx phpmyadmin
+    chmod 640 phpmyadmin/config.inc.php
 
-    # Tạo DB phpmyadmin
-    cat > /opt/phpmyadmin.temp <<EOsql
-CREATE DATABASE IF NOT EXISTS phpmyadmin;
+    # Tao database phpmyadmin
+    mariadb -u root -p"${sql_root_pass}" <<EOF
+CREATE DATABASE IF NOT EXISTS phpmyadmin CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 FLUSH PRIVILEGES;
-EOsql
+EOF
 
-    mariadb -u root -p"${sql_root_pass}" < /opt/phpmyadmin.temp
-    rm -f /opt/phpmyadmin.temp
-
-    # Download và import cấu trúc bảng phpmyadmin
-    curl -o phpmyadmin.sql "${EXT_LINK}"/phpmyadmin.sql
+    # Import schema phpMyAdmin
+    curl -fsSL -o phpmyadmin.sql "${EXT_LINK}/phpmyadmin.sql"
     mariadb -u root -p"${sql_root_pass}" phpmyadmin < phpmyadmin.sql
-    rm -rf phpmyadmin.sql
+    rm -f phpmyadmin.sql
 }
 
 ############################################
@@ -538,99 +579,93 @@ install_wp_cli() {
 # Dynamic calculation
 ############################################
 php_memory_calculation() {
-    if [[ "${PHP_MEM}" -le '262144' ]]; then
-        OPCACHE_MEM='128'
-        MAX_MEMORY='128'
+
+    # PHP_MEM tinh theo KB
+    if [[ "${PHP_MEM}" -le 262144 ]]; then
+        OPCACHE_MEM=128
+        MAX_MEMORY=128
         PHP_REAL_PATH_LIMIT='512k'
-        PHP_REAL_PATH_TTL='14400'
-        MAX_INPUT_VARS="6000"
-    elif [[ "${PHP_MEM}" -gt '262144' && "${PHP_MEM}" -le '393216' ]]; then
-        OPCACHE_MEM='128'
-        MAX_MEMORY='128'
+        PHP_REAL_PATH_TTL=14400
+        MAX_INPUT_VARS=6000
+
+    elif [[ "${PHP_MEM}" -le 393216 ]]; then
+        OPCACHE_MEM=128
+        MAX_MEMORY=128
         PHP_REAL_PATH_LIMIT='640k'
-        PHP_REAL_PATH_TTL='21600'
-        MAX_INPUT_VARS="6000"
-    elif [[ "${PHP_MEM}" -gt '393216' && "${PHP_MEM}" -le '524288' ]]; then
-        OPCACHE_MEM='128'
-        MAX_MEMORY='128'
+        PHP_REAL_PATH_TTL=21600
+        MAX_INPUT_VARS=6000
+
+    elif [[ "${PHP_MEM}" -le 524288 ]]; then
+        OPCACHE_MEM=128
+        MAX_MEMORY=128
         PHP_REAL_PATH_LIMIT='768k'
-        PHP_REAL_PATH_TTL='21600'
-        MAX_INPUT_VARS="6000"
-    elif [[ "${PHP_MEM}" -gt '524288' && "${PHP_MEM}" -le '1049576' ]]; then
-        OPCACHE_MEM='144'
-        MAX_MEMORY='160'
-        PHP_REAL_PATH_LIMIT='768k'
-        PHP_REAL_PATH_TTL='28800'
-        MAX_INPUT_VARS="6000"
-    elif [[ "${PHP_MEM}" -gt '1049576' && "${PHP_MEM}" -le '2097152' ]]; then
-        OPCACHE_MEM='160'
-        MAX_MEMORY='320'
-        PHP_REAL_PATH_LIMIT='1536k'
-        PHP_REAL_PATH_TTL='28800'
-        MAX_INPUT_VARS="6000"
-    elif [[ "${PHP_MEM}" -gt '2097152' && "${PHP_MEM}" -le '3145728' ]]; then
-        OPCACHE_MEM='192'
-        MAX_MEMORY='384'
+        PHP_REAL_PATH_TTL=21600
+        MAX_INPUT_VARS=6000
+
+    elif [[ "${PHP_MEM}" -le 1048576 ]]; then   # 1GB
+        OPCACHE_MEM=192
+        MAX_MEMORY=192
+        PHP_REAL_PATH_LIMIT='1024k'
+        PHP_REAL_PATH_TTL=28800
+        MAX_INPUT_VARS=6000
+
+    elif [[ "${PHP_MEM}" -le 2097152 ]]; then   # 2GB
+        OPCACHE_MEM=256
+        MAX_MEMORY=256
         PHP_REAL_PATH_LIMIT='2048k'
-        PHP_REAL_PATH_TTL='43200'
-        MAX_INPUT_VARS="6000"
-    elif [[ "${PHP_MEM}" -gt '3145728' && "${PHP_MEM}" -le '4194304' ]]; then
-        OPCACHE_MEM='224'
-        MAX_MEMORY='512'
-        PHP_REAL_PATH_LIMIT='3072k'
-        PHP_REAL_PATH_TTL='43200'
-        MAX_INPUT_VARS="6000"
-    elif [[ "${PHP_MEM}" -gt '4194304' && "${PHP_MEM}" -le '8180000' ]]; then
-        OPCACHE_MEM='288'
-        MAX_MEMORY='640'
+        PHP_REAL_PATH_TTL=43200
+        MAX_INPUT_VARS=8000
+
+    elif [[ "${PHP_MEM}" -le 4194304 ]]; then   # 4GB
+        OPCACHE_MEM=384
+        MAX_MEMORY=384
         PHP_REAL_PATH_LIMIT='4096k'
-        PHP_REAL_PATH_TTL='43200'
-        MAX_INPUT_VARS="10000"
-    elif [[ "${PHP_MEM}" -gt '8180000' && "${PHP_MEM}" -le '16360000' ]]; then
-        OPCACHE_MEM='320'
-        MAX_MEMORY='800'
+        PHP_REAL_PATH_TTL=43200
+        MAX_INPUT_VARS=10000
+
+    elif [[ "${PHP_MEM}" -le 8388608 ]]; then   # 8GB
+        OPCACHE_MEM=512
+        MAX_MEMORY=512
         PHP_REAL_PATH_LIMIT='4096k'
-        PHP_REAL_PATH_TTL='43200'
-        MAX_INPUT_VARS="10000"
-    elif [[ "${PHP_MEM}" -gt '16360000' && "${PHP_MEM}" -le '32400000' ]]; then
-        OPCACHE_MEM='480'
-        MAX_MEMORY='1024'
-        PHP_REAL_PATH_LIMIT='4096k'
-        PHP_REAL_PATH_TTL='43200'
-        MAX_INPUT_VARS="10000"
-    elif [[ "${PHP_MEM}" -gt '32400000' && "${PHP_MEM}" -le '64800000' ]]; then
-        OPCACHE_MEM='600'
-        MAX_MEMORY='1280'
-        PHP_REAL_PATH_LIMIT='4096k'
-        PHP_REAL_PATH_TTL='43200'
-        MAX_INPUT_VARS="10000"
-    elif [[ "${PHP_MEM}" -gt '64800000' ]]; then
-        OPCACHE_MEM='800'
-        MAX_MEMORY='2048'
+        PHP_REAL_PATH_TTL=43200
+        MAX_INPUT_VARS=10000
+
+    elif [[ "${PHP_MEM}" -le 16777216 ]]; then  # 16GB
+        OPCACHE_MEM=640
+        MAX_MEMORY=768
         PHP_REAL_PATH_LIMIT='8192k'
-        PHP_REAL_PATH_TTL='86400'
-        MAX_INPUT_VARS="10000"
+        PHP_REAL_PATH_TTL=86400
+        MAX_INPUT_VARS=10000
+
+    else                                        # >16GB
+        OPCACHE_MEM=768
+        MAX_MEMORY=1024
+        PHP_REAL_PATH_LIMIT='8192k'
+        PHP_REAL_PATH_TTL=86400
+        MAX_INPUT_VARS=10000
     fi
 }
 
 cal_ssl_cache_size() {
-    if [[ ${RAM_TOTAL} -gt 500000 && ${RAM_TOTAL} -le 800000 ]]; then
+    local RAM=${RAM_TOTAL}
+
+    if [[ ${RAM} -gt 500000 && ${RAM} -le 800000 ]]; then
         SSL_CACHE_SIZE=20
-    elif [[ ${RAM_TOTAL} -gt 800000 && ${RAM_TOTAL} -le 1000000 ]]; then
+    elif [[ ${RAM} -gt 800000 && ${RAM} -le 1000000 ]]; then
         SSL_CACHE_SIZE=40
-    elif [[ ${RAM_TOTAL} -gt 1000000 && ${RAM_TOTAL} -le 1880000 ]]; then
+    elif [[ ${RAM} -gt 1000000 && ${RAM} -le 1880000 ]]; then
         SSL_CACHE_SIZE=60
-    elif [[ ${RAM_TOTAL} -gt 1880000 && ${RAM_TOTAL} -le 2890000 ]]; then
+    elif [[ ${RAM} -gt 1880000 && ${RAM} -le 2890000 ]]; then
         SSL_CACHE_SIZE=80
-    elif [[ ${RAM_TOTAL} -gt 2890000 && ${RAM_TOTAL} -le 3890000 ]]; then
+    elif [[ ${RAM} -gt 2890000 && ${RAM} -le 3890000 ]]; then
         SSL_CACHE_SIZE=150
-    elif [[ ${RAM_TOTAL} -gt 3890000 && ${RAM_TOTAL} -le 7800000 ]]; then
+    elif [[ ${RAM} -gt 3890000 && ${RAM} -le 7800000 ]]; then
         SSL_CACHE_SIZE=300
-    elif [[ ${RAM_TOTAL} -gt 7800000 && ${RAM_TOTAL} -le 15600000 ]]; then
+    elif [[ ${RAM} -gt 7800000 && ${RAM} -le 15600000 ]]; then
         SSL_CACHE_SIZE=500
-    elif [[ ${RAM_TOTAL} -gt 15600000 && ${RAM_TOTAL} -le 23600000 ]]; then
+    elif [[ ${RAM} -gt 15600000 && ${RAM} -le 23600000 ]]; then
         SSL_CACHE_SIZE=1000
-    elif [[ ${RAM_TOTAL} -gt 23600000 ]]; then
+    elif [[ ${RAM} -gt 23600000 ]]; then
         SSL_CACHE_SIZE=2000
     else
         SSL_CACHE_SIZE=10
@@ -638,279 +673,259 @@ cal_ssl_cache_size() {
 }
 
 php_parameter() {
-    if [[ ${CPU_CORES} -ge 4 && ${CPU_CORES} -lt 6 && ${RAM_TOTAL} -gt 1049576 && ${RAM_TOTAL} -le 2097152 ]]; then
-        PM_MAX_CHILDREN=$((CPU_CORES * 6))
-        PM_MAX_REQUEST=2000
-    elif [[ ${CPU_CORES} -ge 4 && ${CPU_CORES} -lt 6 && ${RAM_TOTAL} -gt 2097152 && ${RAM_TOTAL} -le 3145728 ]]; then
-        PM_MAX_CHILDREN=$((CPU_CORES * 6))
-        PM_MAX_REQUEST=2000
-    elif [[ ${CPU_CORES} -ge 4 && ${CPU_CORES} -lt 6 && ${RAM_TOTAL} -gt 3145728 && ${RAM_TOTAL} -le 4194304 ]]; then
-        PM_MAX_CHILDREN=$((CPU_CORES * 6))
-        PM_MAX_REQUEST=2000
-    elif [[ ${CPU_CORES} -ge 4 && ${CPU_CORES} -lt 6 && ${RAM_TOTAL} -gt 4194304 ]]; then
-        PM_MAX_CHILDREN=$((CPU_CORES * 6))
-        PM_MAX_REQUEST=2000
-    elif [[ ${CPU_CORES} -ge 6 && ${CPU_CORES} -lt 8 && ${RAM_TOTAL} -gt 3145728 && ${RAM_TOTAL} -le 4194304 ]]; then
-        PM_MAX_CHILDREN=$((CPU_CORES * 6))
-        PM_MAX_REQUEST=2000
-    elif [[ ${CPU_CORES} -ge 6 && ${CPU_CORES} -lt 8 && ${RAM_TOTAL} -gt 4194304 ]]; then
-        PM_MAX_CHILDREN=$((CPU_CORES * 6))
-        PM_MAX_REQUEST=2000
-    elif [[ ${CPU_CORES} -ge 8 && ${CPU_CORES} -lt 16 && ${RAM_TOTAL} -gt 3145728 && ${RAM_TOTAL} -le 4194304 ]]; then
-        PM_MAX_CHILDREN=$((CPU_CORES * 6))
-        PM_MAX_REQUEST=2000
-    elif [[ ${CPU_CORES} -ge 8 && ${CPU_CORES} -lt 12 && ${RAM_TOTAL} -gt 4194304 ]]; then
-        PM_MAX_CHILDREN=$((CPU_CORES * 6))
-        PM_MAX_REQUEST=2000
-    elif [[ ${CPU_CORES} -ge 13 && ${CPU_CORES} -lt 16 && ${RAM_TOTAL} -gt 4194304 ]]; then
-        PM_MAX_CHILDREN=$((CPU_CORES * 6))
-        PM_MAX_REQUEST=2000
-    elif [[ ${CPU_CORES} -ge 17 && ${RAM_TOTAL} -gt 4194304 ]]; then
-        PM_MAX_CHILDREN=$((CPU_CORES * 5))
-        PM_MAX_REQUEST=2000
-    else
-        PM_MAX_CHILDREN=$((CPU_CORES * 5))
+    if [[ ${CPU_CORES} -le 3 ]]; then
+        PM_MAX_CHILDREN=$((CPU_CORES * 4))
         PM_MAX_REQUEST=500
+
+    elif [[ ${CPU_CORES} -le 6 ]]; then
+        PM_MAX_CHILDREN=$((CPU_CORES * 6))
+        PM_MAX_REQUEST=2000
+
+    elif [[ ${CPU_CORES} -le 12 ]]; then
+        PM_MAX_CHILDREN=$((CPU_CORES * 6))
+        PM_MAX_REQUEST=3000
+
+    elif [[ ${CPU_CORES} -le 16 ]]; then
+        PM_MAX_CHILDREN=$((CPU_CORES * 5))
+        PM_MAX_REQUEST=4000
+
+    else
+        PM_MAX_CHILDREN=$((CPU_CORES * 4))
+        PM_MAX_REQUEST=5000
     fi
 }
 
 mariadb_calculation() {
-    if [[ ${RAM_TOTAL} -gt 400000 && ${RAM_TOTAL} -le 2099152 ]]; then #1GB Ram
+
+    # ===== 1GB RAM =====
+    if [[ ${RAM_TOTAL} -gt 400000 && ${RAM_TOTAL} -le 2099152 ]]; then
         max_allowed_packet="32M"
-        back_log="100"
+        back_log="150"
         max_connections="150"
+
         key_buffer_size="32M"
         myisam_sort_buffer_size="32M"
-        myisam_max_sort_file_size="2048M"
-        innodb_log_buffer_size="8M"
-        join_buffer_size="64K"
-        read_buffer_size="64K"
-        sort_buffer_size="128K"
-        table_definition_cache="4096"
-        table_open_cache="2048"
-        thread_cache_size="64"
-        tmp_table_size="32M"
-        max_heap_table_size="32M"
-        query_cache_limit="512K"
-        query_cache_size="16M"
-        innodb_open_files="2000"
-        innodb_buffer_pool_size="48M"
-        innodb_io_capacity="100"
-        aria_pagecache_buffer_size="8M"
-        aria_sort_buffer_size="8M"
-        net_buffer_length="8192"
-        read_rnd_buffer_size="256K"
-        innodb_log_file_size="128M"
-        innodb_read_io_threads="2"
-        aria_log_file_size="32M"
-        key_buffer="32M "
-        sort_buffer="16M"
-        read_buffer="16M"
-        write_buffer="16M"
-    fi
 
-    if [[ ${RAM_TOTAL} -gt 2099152 && ${RAM_TOTAL} -le 4198304 ]]; then #2GB Ram
-        max_allowed_packet="48M"
-        back_log="200"
-        max_connections="200"
-        key_buffer_size="32M"
-        myisam_sort_buffer_size="64M"
-        myisam_max_sort_file_size="2048M"
-        innodb_log_buffer_size="8M"
+        innodb_buffer_pool_size="256M"
+        innodb_log_file_size="128M"
+        innodb_log_buffer_size="16M"
+        innodb_io_capacity="200"
+
         join_buffer_size="128K"
         read_buffer_size="128K"
         sort_buffer_size="256K"
-        table_definition_cache="8192"
-        table_open_cache="4096"
-        thread_cache_size="128"
-        tmp_table_size="128M"
-        max_heap_table_size="128M"
-        query_cache_limit="1024K"
-        query_cache_size="64M"
-        innodb_open_files="4000"
-        innodb_buffer_pool_size="192M"
-        innodb_io_capacity="200"
-        aria_pagecache_buffer_size="32M"
-        aria_sort_buffer_size="32M"
-        net_buffer_length="8192"
         read_rnd_buffer_size="256K"
-        innodb_log_file_size="128M"
+
+        table_open_cache="2048"
+        table_definition_cache="4096"
+        thread_cache_size="64"
+
+        tmp_table_size="64M"
+        max_heap_table_size="64M"
+
+        aria_pagecache_buffer_size="16M"
+        aria_sort_buffer_size="16M"
+
         innodb_read_io_threads="2"
-        aria_log_file_size="32M"
-        key_buffer="32M "
-        sort_buffer="16M"
-        read_buffer="16M"
-        write_buffer="16M"
-    fi
-
-    if [[ ${RAM_TOTAL} -gt 4198304 && ${RAM_TOTAL} -le 8396608 ]]; then #4GB Ram
-        max_allowed_packet="64M"
-        back_log="200"
-        max_connections="350"
-        key_buffer_size="256M"
-        myisam_sort_buffer_size="256M"
-        myisam_max_sort_file_size="2048M"
-        innodb_log_buffer_size="8M"
-        join_buffer_size="256K"
-        read_buffer_size="256K"
-        sort_buffer_size="256K"
-        table_definition_cache="8192"
-        table_open_cache="4096"
-        thread_cache_size="256"
-        tmp_table_size="256M"
-        max_heap_table_size="256M"
-        query_cache_limit="1024K"
-        query_cache_size="80M"
-        innodb_open_files="4000"
-        innodb_buffer_pool_size="512M"
-        innodb_io_capacity="300"
-        aria_pagecache_buffer_size="64M"
-        aria_sort_buffer_size="64M"
         net_buffer_length="16384"
-        read_rnd_buffer_size="512K"
-        innodb_log_file_size="256M"
-        innodb_read_io_threads="4"
-        aria_log_file_size="64M"
-        key_buffer="256M "
-        sort_buffer="32M"
-        read_buffer="32M"
-        write_buffer="32M"
     fi
 
-    if [[ ${RAM_TOTAL} -gt 8396608 && ${RAM_TOTAL} -le 16793216 ]]; then #8GB Ram
-        max_allowed_packet="64M"
-        back_log="512"
-        max_connections="400"
-        key_buffer_size="384M"
-        myisam_sort_buffer_size="256M"
-        myisam_max_sort_file_size="2048M"
+    # ===== 2GB RAM =====
+    if [[ ${RAM_TOTAL} -gt 2099152 && ${RAM_TOTAL} -le 4198304 ]]; then
+        max_allowed_packet="48M"
+        back_log="200"
+        max_connections="200"
+
+        key_buffer_size="32M"
+        myisam_sort_buffer_size="64M"
+
+        innodb_buffer_pool_size="512M"
+        innodb_log_file_size="192M"
         innodb_log_buffer_size="16M"
+        innodb_io_capacity="300"
+
         join_buffer_size="256K"
         read_buffer_size="256K"
         sort_buffer_size="512K"
+        read_rnd_buffer_size="256K"
+
+        table_open_cache="4096"
         table_definition_cache="8192"
-        table_open_cache="8192"
-        thread_cache_size="256"
-        tmp_table_size="512M"
-        max_heap_table_size="512M"
-        query_cache_limit="1024K"
-        query_cache_size="128M"
-        innodb_open_files="8000"
-        innodb_buffer_pool_size="1024M"
-        innodb_io_capacity="400"
-        aria_pagecache_buffer_size="64M"
-        aria_sort_buffer_size="64M"
+        thread_cache_size="128"
+
+        tmp_table_size="128M"
+        max_heap_table_size="128M"
+
+        aria_pagecache_buffer_size="32M"
+        aria_sort_buffer_size="32M"
+
+        innodb_read_io_threads="2"
         net_buffer_length="16384"
-        read_rnd_buffer_size="512K"
-        innodb_log_file_size="384M"
-        innodb_read_io_threads="4"
-        aria_log_file_size="64M"
-        key_buffer="384M "
-        sort_buffer="64M"
-        read_buffer="64M"
-        write_buffer="64M"
     fi
 
-    if [[ ${RAM_TOTAL} -gt 16793216 && ${RAM_TOTAL} -le 33586432 ]]; then #16GB Ram
+    # ===== 4GB RAM =====
+    if [[ ${RAM_TOTAL} -gt 4198304 && ${RAM_TOTAL} -le 8396608 ]]; then
+        max_allowed_packet="64M"
+        back_log="300"
+        max_connections="300"
+
+        key_buffer_size="64M"
+        myisam_sort_buffer_size="128M"
+
+        innodb_buffer_pool_size="1536M"
+        innodb_log_file_size="256M"
+        innodb_log_buffer_size="32M"
+        innodb_io_capacity="400"
+
+        join_buffer_size="512K"
+        read_buffer_size="512K"
+        sort_buffer_size="1M"
+        read_rnd_buffer_size="512K"
+
+        table_open_cache="8192"
+        table_definition_cache="8192"
+        thread_cache_size="256"
+
+        tmp_table_size="256M"
+        max_heap_table_size="256M"
+
+        aria_pagecache_buffer_size="64M"
+        aria_sort_buffer_size="64M"
+
+        innodb_read_io_threads="4"
+        net_buffer_length="16384"
+    fi
+
+    # ===== 8GB RAM =====
+    if [[ ${RAM_TOTAL} -gt 8396608 && ${RAM_TOTAL} -le 16793216 ]]; then
+        max_allowed_packet="64M"
+        back_log="512"
+        max_connections="400"
+
+        key_buffer_size="128M"
+        myisam_sort_buffer_size="256M"
+
+        innodb_buffer_pool_size="4096M"
+        innodb_log_file_size="384M"
+        innodb_log_buffer_size="32M"
+        innodb_io_capacity="500"
+
+        join_buffer_size="512K"
+        read_buffer_size="512K"
+        sort_buffer_size="1M"
+        read_rnd_buffer_size="512K"
+
+        table_open_cache="8192"
+        table_definition_cache="8192"
+        thread_cache_size="256"
+
+        tmp_table_size="512M"
+        max_heap_table_size="512M"
+
+        aria_pagecache_buffer_size="128M"
+        aria_sort_buffer_size="128M"
+
+        innodb_read_io_threads="4"
+        net_buffer_length="16384"
+    fi
+
+    # ===== 16GB RAM =====
+    if [[ ${RAM_TOTAL} -gt 16793216 && ${RAM_TOTAL} -le 33586432 ]]; then
         max_allowed_packet="64M"
         back_log="768"
         max_connections="500"
-        key_buffer_size="512M"
+
+        key_buffer_size="256M"
         myisam_sort_buffer_size="512M"
-        myisam_max_sort_file_size="4096M"
-        innodb_log_buffer_size="32M"
+
+        innodb_buffer_pool_size="8192M"
+        innodb_log_file_size="512M"
+        innodb_log_buffer_size="64M"
+        innodb_io_capacity="600"
+
         join_buffer_size="1M"
         read_buffer_size="1M"
         sort_buffer_size="2M"
-        table_definition_cache="10240"
+        read_rnd_buffer_size="512K"
+
         table_open_cache="10240"
+        table_definition_cache="10240"
         thread_cache_size="384"
+
         tmp_table_size="768M"
         max_heap_table_size="768M"
-        query_cache_limit="1024K"
-        query_cache_size="160M"
-        innodb_open_files="10000"
-        innodb_buffer_pool_size="4096M"
-        innodb_io_capacity="500"
-        aria_pagecache_buffer_size="128M"
-        aria_sort_buffer_size="128M"
-        net_buffer_length="16384"
-        read_rnd_buffer_size="512K"
-        innodb_log_file_size="640M"
+
+        aria_pagecache_buffer_size="256M"
+        aria_sort_buffer_size="256M"
+
         innodb_read_io_threads="4"
-        aria_log_file_size="64M"
-        key_buffer="768M "
-        sort_buffer="128M"
-        read_buffer="128M"
-        write_buffer="128M"
+        net_buffer_length="16384"
     fi
 
-    if [[ "$(expr "${RAM_TOTAL}" \>= 33586432)" == "1" ]]; then #32GB Ram
+    # ===== 32GB RAM =====
+    if [[ ${RAM_TOTAL} -gt 33586432 && ${RAM_TOTAL} -le 64000000 ]]; then
         max_allowed_packet="64M"
         back_log="1024"
         max_connections="600"
-        key_buffer_size="768M"
+
+        key_buffer_size="512M"
         myisam_sort_buffer_size="768M"
-        myisam_max_sort_file_size="8192M"
+
+        innodb_buffer_pool_size="16384M"
+        innodb_log_file_size="768M"
         innodb_log_buffer_size="64M"
+        innodb_io_capacity="700"
+
         join_buffer_size="2M"
         read_buffer_size="2M"
         sort_buffer_size="2M"
-        table_definition_cache="10240"
+        read_rnd_buffer_size="1M"
+
         table_open_cache="10240"
-        thread_cache_size="384"
+        table_definition_cache="10240"
+        thread_cache_size="512"
+
         tmp_table_size="1024M"
         max_heap_table_size="1024M"
-        query_cache_limit="1536K"
-        query_cache_size="256M"
-        innodb_open_files="10000"
-        innodb_buffer_pool_size="8192M"
-        innodb_io_capacity="600"
-        aria_pagecache_buffer_size="128M"
-        aria_sort_buffer_size="128M"
-        net_buffer_length="16384"
-        read_rnd_buffer_size="512K"
-        innodb_log_file_size="768M"
-        innodb_read_io_threads="4"
-        aria_log_file_size="64M"
-        key_buffer="1024M "
-        sort_buffer="256M"
-        read_buffer="256M"
-        write_buffer="256M"
-    fi
 
-    if [[ "$(expr "${RAM_TOTAL}" \>= 64000000)" == "1" ]]; then #64GB Ram
-        max_allowed_packet="80M"
-        back_log="1024"
-        max_connections="800"
-        key_buffer_size="1024M"
-        myisam_sort_buffer_size="1024M"
-        myisam_max_sort_file_size="10240M"
-        innodb_log_buffer_size="64M"
-        join_buffer_size="2M"
-        read_buffer_size="2M"
-        sort_buffer_size="2M"
-        table_definition_cache="10240"
-        table_open_cache="10240"
-        thread_cache_size="384"
-        tmp_table_size="1536M"
-        max_heap_table_size="1536M"
-        query_cache_limit="1536K"
-        query_cache_size="256M"
-        innodb_open_files="10000"
-        innodb_buffer_pool_size="12288M"
-        innodb_io_capacity="800"
         aria_pagecache_buffer_size="256M"
         aria_sort_buffer_size="256M"
+
+        innodb_read_io_threads="8"
         net_buffer_length="16384"
-        read_rnd_buffer_size="512K"
+    fi
+
+    # ===== >= 64GB RAM =====
+    if [[ ${RAM_TOTAL} -gt 64000000 ]]; then
+        max_allowed_packet="80M"
+        back_log="2048"
+        max_connections="800"
+
+        key_buffer_size="1024M"
+        myisam_sort_buffer_size="1024M"
+
+        innodb_buffer_pool_size="24576M"
         innodb_log_file_size="1024M"
-        innodb_read_io_threads="4"
-        aria_log_file_size="128M"
-        key_buffer="1536M "
-        sort_buffer="384M"
-        read_buffer="384M"
-        write_buffer="384M"
+        innodb_log_buffer_size="128M"
+        innodb_io_capacity="1000"
+
+        join_buffer_size="2M"
+        read_buffer_size="2M"
+        sort_buffer_size="4M"
+        read_rnd_buffer_size="1M"
+
+        table_open_cache="20480"
+        table_definition_cache="20480"
+        thread_cache_size="768"
+
+        tmp_table_size="1536M"
+        max_heap_table_size="1536M"
+
+        aria_pagecache_buffer_size="512M"
+        aria_sort_buffer_size="512M"
+
+        innodb_read_io_threads="8"
+        net_buffer_length="16384"
     fi
 }
 
@@ -980,119 +995,150 @@ self_signed_ssl() {
 
 # Config Nginx
 create_nginx_conf() {
-    mkdir -p /etc/nginx/alias
-    mkdir -p /etc/nginx/redirect
-    mkdir -p /etc/nginx/php
-    mkdir -p /etc/nginx/conf.d
-    mkdir -p /etc/nginx/pagespeed
-    mkdir -p /usr/share/nginx/html/
-    chown -R nginx. /usr/share/nginx/html/
-    mv /etc/nginx/nginx.conf /etc/nginx/nginx.conf."$(date +%Y-%m-%d)"
 
-    cat >>"/etc/nginx/nginx.conf" <<EONGINXCONF
+    mkdir -p \
+        /etc/nginx/alias \
+        /etc/nginx/redirect \
+        /etc/nginx/php \
+        /etc/nginx/conf.d \
+        /etc/nginx/pagespeed \
+        /etc/nginx/extra \
+        /usr/share/nginx/html
+
+    chown -R nginx:nginx /usr/share/nginx/html
+
+    # Backup nginx.conf nếu tồn tại
+    if [ -f /etc/nginx/nginx.conf ]; then
+        mv /etc/nginx/nginx.conf /etc/nginx/nginx.conf.$(date +%F-%H%M%S)
+    fi
+
+    cat > /etc/nginx/nginx.conf <<'EONGINXCONF'
 user nginx;
 worker_processes auto;
-worker_rlimit_nofile 260000;
+worker_rlimit_nofile 100000;
 
-error_log  /var/log/nginx/error.log warn;
-pid        /run/nginx.pid;
+error_log /var/log/nginx/error.log warn;
+pid /run/nginx.pid;
 
 events {
-    worker_connections ${MAX_CLIENT};
-    accept_mutex off;
-    accept_mutex_delay 200ms;
+    worker_connections __MAX_CLIENT__;
     use epoll;
-    #multi_accept on;
+    multi_accept on;
 }
 
 http {
-    index  index.html index.htm index.php;
     include       /etc/nginx/mime.types;
     default_type  application/octet-stream;
+
     charset utf-8;
+    index index.html index.htm index.php;
 
-    log_format  main  '\$remote_addr - \$remote_user [\$time_local] "\$request" '
-                  '\$status \$body_bytes_sent "\$http_referer" '
-                  '"\$http_user_agent" "\$http_x_forwarded_for"';
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent"';
 
-    access_log  off;
+    access_log /var/log/nginx/access.log main;
     server_tokens off;
 
     sendfile on;
-
     tcp_nopush on;
-    tcp_nodelay off;
+    tcp_nodelay on;
+
+    keepalive_timeout 15;
+    reset_timedout_connection on;
+    send_timeout 60s;
 
     types_hash_max_size 2048;
     server_names_hash_bucket_size 128;
     server_names_hash_max_size 10240;
+
     client_max_body_size 1024m;
     client_body_buffer_size 128k;
-    client_body_in_file_only off;
     client_body_timeout 60s;
+    client_header_timeout 20s;
     client_header_buffer_size 256k;
-    client_header_timeout  20s;
     large_client_header_buffers 8 256k;
-    keepalive_timeout 15;
-    keepalive_disable msie6;
-    reset_timedout_connection on;
-    send_timeout 60s;
 
-    disable_symlinks if_not_owner from=\$document_root;
-    server_name_in_redirect off;
-
-    open_file_cache max=2000 inactive=20s;
+    open_file_cache max=5000 inactive=30s;
     open_file_cache_valid 120s;
     open_file_cache_min_uses 2;
     open_file_cache_errors off;
 
-    # Limit Request
-    limit_req_status 403;
-    # limit the number of connections per single IP
-    limit_conn_zone \$binary_remote_addr zone=conn_limit_per_ip:10m;
-    # limit the number of requests for a given session
-    limit_req_zone \$binary_remote_addr zone=req_limit_per_ip:10m rate=1r/s;
+    # Connection & Request Limit
+    limit_conn_zone $binary_remote_addr zone=conn_limit_per_ip:10m;
+    limit_req_zone  $binary_remote_addr zone=req_limit_per_ip:10m rate=5r/s;
+    limit_req_status 429;
 
-    # Custom Response Headers
-    more_set_headers 'Server: Nginx';
-    more_set_headers 'X-Content-Type-Options    "nosniff" always';
-    more_set_headers 'X-XSS-Protection          "1; mode=block" always';
-    more_set_headers 'Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always';
-    more_set_headers 'Referrer-Policy no-referrer-when-downgrade';
-    
-    # Custom Variables
-    map \$scheme \$https_suffix { default ''; https '-https'; }
+    # Security Headers (native)
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
 
-    include /etc/nginx/extra/nginx_cache.conf;
+    # Variables
+    map $scheme $https_suffix {
+        default '';
+        https '-https';
+    }
+
+    # Includes
     include /etc/nginx/extra/gzip.conf;
-    #include /etc/nginx/extra/brotli.conf;
     include /etc/nginx/extra/ssl.conf;
     include /etc/nginx/extra/cloudflare.conf;
+    include /etc/nginx/php/*.conf;
     include /etc/nginx/web_apps.conf;
     include /etc/nginx/conf.d/*.conf;
     include /etc/nginx/redirect/*.conf;
 }
 EONGINXCONF
+
+    # Replace MAX_CLIENT placeholder
+    sed -i "s/__MAX_CLIENT__/${MAX_CLIENT}/g" /etc/nginx/nginx.conf
 }
 
-_create_mod_security_config(){
+_create_mod_security_config() {
+
+    # Kiểm tra module ModSecurity có tồn tại
+    if ! nginx -V 2>&1 | grep -q modsecurity; then
+        echo "❌ Nginx chưa được build ModSecurity – bỏ qua"
+        return
+    fi
+
     mkdir -p /etc/nginx/modsec
-    cp /usr/share/nginx_module/ModSecurity/modsecurity.conf-recommended /etc/nginx/modsec/modsecurity.conf
-    cp /usr/share/nginx_module/ModSecurity/unicode.mapping /etc/nginx/modsec
-    sed -i 's/SecRuleEngine DetectionOnly/SecRuleEngine On/' /etc/nginx/modsec/modsecurity.conf
-    rm -rf /etc/nginx/modsec/main.conf
-    cat >> "/etc/nginx/modsec/main.conf" << EOmodsec_main
+
+    # ModSecurity core config
+    if [ ! -f /etc/nginx/modsec/modsecurity.conf ]; then
+        cp /etc/modsecurity/modsecurity.conf-recommended \
+           /etc/nginx/modsec/modsecurity.conf
+
+        sed -i 's/SecRuleEngine DetectionOnly/SecRuleEngine On/' \
+            /etc/nginx/modsec/modsecurity.conf
+    fi
+
+    cp /etc/modsecurity/unicode.mapping /etc/nginx/modsec/
+
+    # OWASP CRS
+    CRS_DIR="/etc/nginx/owasp-modsecurity-crs"
+
+    if [ ! -d "${CRS_DIR}" ]; then
+        git clone --depth=1 https://github.com/coreruleset/coreruleset.git "${CRS_DIR}"
+    fi
+
+    if [ ! -f "${CRS_DIR}/crs-setup.conf" ]; then
+        cp "${CRS_DIR}/crs-setup.conf.example" "${CRS_DIR}/crs-setup.conf"
+    fi
+
+    if [ ! -f "${CRS_DIR}/rules/RESPONSE-999-EXCLUSION-RULES-AFTER-CRS.conf" ]; then
+        cp "${CRS_DIR}/rules/RESPONSE-999-EXCLUSION-RULES-AFTER-CRS.conf.example" \
+           "${CRS_DIR}/rules/RESPONSE-999-EXCLUSION-RULES-AFTER-CRS.conf"
+    fi
+
+    # main.conf (overwrite – không append)
+    cat > /etc/nginx/modsec/main.conf <<'EOF'
 include /etc/nginx/modsec/modsecurity.conf
 include /etc/nginx/owasp-modsecurity-crs/crs-setup.conf
 include /etc/nginx/owasp-modsecurity-crs/rules/*.conf
-EOmodsec_main
-
-    git clone https://github.com/SpiderLabs/owasp-modsecurity-crs.git
-    cd_dir owasp-modsecurity-crs
-    mv crs-setup.conf.example crs-setup.conf
-    cd_dir rules
-    mv RESPONSE-999-EXCLUSION-RULES-AFTER-CRS.conf.example RESPONSE-999-EXCLUSION-RULES-AFTER-CRS.conf
-    cd_dir "${DIR}"
+EOF
 }
 
 create_wordpress_conf() {
@@ -2123,11 +2169,14 @@ wp_rocket_nginx() {
 
 # Config PHP-FPM
 php_global_config() {
+
+    # Backup config cũ
     if [[ -f "$PHP1_CONFIG_PATH/php-fpm.conf" ]]; then
-        mv "$PHP1_CONFIG_PATH"/php-fpm.conf "$PHP1_CONFIG_PATH"/php-fpm.conf."$(date +%Y-%m-%d)"
+        mv "$PHP1_CONFIG_PATH/php-fpm.conf" \
+           "$PHP1_CONFIG_PATH/php-fpm.conf.$(date +%F)"
     fi
 
-    cat >>"$PHP1_CONFIG_PATH/php-fpm.conf" <<EOphp_fpm_conf
+    cat > "$PHP1_CONFIG_PATH/php-fpm.conf" <<EOF
 ;;;;;;;;;;;;;;;;;;;;;
 ; FPM Configuration ;
 ;;;;;;;;;;;;;;;;;;;;;
@@ -2141,53 +2190,69 @@ log_level = warning
 emergency_restart_threshold = 10
 emergency_restart_interval = 1m
 process_control_timeout = 10s
-daemonize = yes
-EOphp_fpm_conf
+daemonize = no
+EOF
 
+    # Pool config
     if [[ -f "$PHP1_POOL_PATH/www.conf" ]]; then
-        mv "$PHP1_POOL_PATH"/www.conf "$PHP1_POOL_PATH"/www.conf."$(date +%Y-%m-%d)"
+        mv "$PHP1_POOL_PATH/www.conf" \
+           "$PHP1_POOL_PATH/www.conf.$(date +%F)"
     fi
-    cat >>"$PHP1_POOL_PATH/www.conf" <<EOwww_conf
+
+    cat > "$PHP1_POOL_PATH/www.conf" <<EOF
 [www]
-listen = /var/run/php-fpm.sock;
-listen.allowed_clients = 127.0.0.1
+listen = /var/run/php/php${PHP_VERSION}-fpm.sock
 listen.owner = nginx
 listen.group = nginx
 listen.mode = 0660
+
 user = nginx
 group = nginx
+
 pm = ondemand
 pm.max_children = ${PM_MAX_CHILDREN}
 pm.max_requests = ${PM_MAX_REQUEST}
-pm.process_idle_timeout = 20
-;slowlog = /var/log/php-fpm/www-slow.log
+pm.process_idle_timeout = 20s
+
 chdir = /
+
 php_admin_value[error_log] = /var/log/php-fpm/www-error.log
 php_admin_flag[log_errors] = on
-php_value[session.save_handler] = files
-php_value[session.save_path]    = /var/lib/php/session
-php_value[soap.wsdl_cache_dir]  = /var/lib/php/wsdlcache
-php_admin_value[disable_functions] = exec,system,passthru,shell_exec,proc_close,proc_open,dl,popen,show_source,posix_kill,posix_mkfifo,posix_getpwuid,posix_setpgid,posix_setsid,posix_setuid,posix_setgid,posix_seteuid,posix_setegid,posix_uname
-php_admin_value[open_basedir] = /usr/share/nginx/:/tmp/:/var/tmp/:/dev/urandom:/usr/share/php/:/dev/shm:/var/lib/php/sessions/:/usr/share/doc:/var/www/:/usr/local/apache2/htdocs/
-security.limit_extensions = .php
-EOwww_conf
 
-    mkdir -p /var/lib/php/session
+php_value[session.save_handler] = files
+php_value[session.save_path] = /var/lib/php/sessions
+php_value[soap.wsdl_cache_dir] = /var/lib/php/wsdlcache
+
+php_admin_value[disable_functions] = exec,system,passthru,shell_exec,proc_open,popen,show_source,dl
+php_admin_value[open_basedir] = /usr/share/nginx:/var/www:/tmp:/var/tmp:/dev/urandom:/usr/share/php:/dev/shm:/var/lib/php
+
+security.limit_extensions = .php
+EOF
+
+    # Create directories
+    mkdir -p /var/lib/php/sessions
     mkdir -p /var/lib/php/wsdlcache
     mkdir -p /var/log/php-fpm
-    chown -R nginx:nginx /var/lib/php/session
-    chown -R nginx:nginx /var/lib/php/wsdlcache
+
+    chown -R nginx:nginx /var/lib/php
     chown -R nginx:nginx /var/log/php-fpm
-    chmod 755 /var/lib/php/session
-    chmod 755 /var/lib/php/wsdlcache
+
+    chmod 730 /var/lib/php/sessions
+    chmod 730 /var/lib/php/wsdlcache
+
+    systemctl daemon-reload
+    systemctl restart php${PHP_VERSION}-fpm
 }
 
 php2_global_config() {
+
+    # Backup config cũ
     if [[ -f "$PHP2_CONFIG_PATH/php-fpm.conf" ]]; then
-        mv "$PHP2_CONFIG_PATH"/php-fpm.conf "$PHP2_CONFIG_PATH"/php-fpm.conf."$(date +%Y-%m-%d)"
+        mv "$PHP2_CONFIG_PATH/php-fpm.conf" \
+           "$PHP2_CONFIG_PATH/php-fpm.conf.$(date +%F)"
     fi
 
-    cat >>"$PHP2_CONFIG_PATH/php-fpm.conf" <<EOphp_fpm_conf
+    cat > "$PHP2_CONFIG_PATH/php-fpm.conf" <<EOF
 ;;;;;;;;;;;;;;;;;;;;;
 ; FPM Configuration ;
 ;;;;;;;;;;;;;;;;;;;;;
@@ -2196,414 +2261,358 @@ include=$PHP2_POOL_PATH/*.conf
 
 [global]
 pid = /run/php/php${PHP_VERSION_2}-fpm.pid
-error_log = /var/log/php2-fpm/error.log
+error_log = /var/log/php${PHP_VERSION_2}-fpm/error.log
 log_level = warning
 emergency_restart_threshold = 10
 emergency_restart_interval = 1m
 process_control_timeout = 10s
-daemonize = yes
-EOphp_fpm_conf
+daemonize = no
+EOF
 
+    # Pool config
     if [[ -f "$PHP2_POOL_PATH/www.conf" ]]; then
-        mv "$PHP2_POOL_PATH"/www.conf "$PHP2_POOL_PATH"/www.conf."$(date +%Y-%m-%d)"
+        mv "$PHP2_POOL_PATH/www.conf" \
+           "$PHP2_POOL_PATH/www.conf.$(date +%F)"
     fi
-    cat >>"$PHP2_POOL_PATH/www.conf" <<EOwww_conf
+
+    cat > "$PHP2_POOL_PATH/www.conf" <<EOF
 [www]
-listen = /var/run/php2-fpm.sock;
-listen.allowed_clients = 127.0.0.1
+listen = /var/run/php/php${PHP_VERSION_2}-fpm.sock
 listen.owner = nginx
 listen.group = nginx
 listen.mode = 0660
+
 user = nginx
 group = nginx
+
 pm = ondemand
 pm.max_children = ${PM_MAX_CHILDREN}
 pm.max_requests = ${PM_MAX_REQUEST}
-pm.process_idle_timeout = 20
-;slowlog = /var/log/php2-fpm/www-slow.log
-chdir = /
-php_admin_value[error_log] = /var/log/php2-fpm/www-error.log
-php_admin_flag[log_errors] = on
-php_value[session.save_handler] = files
-php_value[session.save_path]    = /var/lib/php/session
-php_value[soap.wsdl_cache_dir]  = /var/lib/php/wsdlcache
-php_admin_value[disable_functions] = exec,system,passthru,shell_exec,dl,show_source,posix_kill,posix_mkfifo,posix_getpwuid,posix_setpgid,posix_setsid,posix_setuid,posix_setgid,posix_seteuid,posix_setegid,posix_uname
-;php_admin_value[disable_functions] = exec,system,passthru,shell_exec,proc_close,proc_open,dl,popen,show_source,posix_kill,posix_mkfifo,posix_getpwuid,posix_setpgid,posix_setsid,posix_setuid,posix_setgid,posix_seteuid,posix_setegid,posix_uname
-;php_admin_value[open_basedir] = ${DEFAULT_DIR_TOOL}/:/tmp/:/var/tmp/:/dev/urandom:/usr/share/php/:/dev/shm:/var/lib/php/sessions/
-security.limit_extensions = .php
-EOwww_conf
+pm.process_idle_timeout = 20s
 
-    mkdir -p /var/lib/php/session
+chdir = /
+
+php_admin_value[error_log] = /var/log/php${PHP_VERSION_2}-fpm/www-error.log
+php_admin_flag[log_errors] = on
+
+php_value[session.save_handler] = files
+php_value[session.save_path] = /var/lib/php/sessions
+php_value[soap.wsdl_cache_dir] = /var/lib/php/wsdlcache
+
+php_admin_value[disable_functions] = exec,system,passthru,shell_exec,proc_open,popen,show_source,dl
+php_admin_value[open_basedir] = /usr/share/nginx:/var/www:/tmp:/var/tmp:/dev/urandom:/usr/share/php:/dev/shm:/var/lib/php
+
+security.limit_extensions = .php
+EOF
+
+    # Create directories
+    mkdir -p /var/lib/php/sessions
     mkdir -p /var/lib/php/wsdlcache
-    mkdir -p /var/log/php2-fpm
-    chown -R nginx:nginx /var/lib/php/session
-    chown -R nginx:nginx /var/lib/php/wsdlcache
-    chown -R nginx:nginx /var/log/php2-fpm
-    chmod 755 /var/lib/php/session
-    chmod 755 /var/lib/php/wsdlcache
+    mkdir -p /var/log/php${PHP_VERSION_2}-fpm
+
+    chown -R nginx:nginx /var/lib/php
+    chown -R nginx:nginx /var/log/php${PHP_VERSION_2}-fpm
+
+    chmod 730 /var/lib/php/sessions
+    chmod 730 /var/lib/php/wsdlcache
+
+    systemctl daemon-reload
+    systemctl restart php${PHP_VERSION_2}-fpm
 }
 
 # Custom PHP Ini
 hostvn_custom_ini() {
-    cat >"$PHP1_INI_PATH/00-hostvn-custom.ini" <<EOhostvn_custom_ini
+
+    cat > "$PHP1_INI_PATH/00-hostvn-custom.ini" <<EOF
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; HOSTVN Custom PHP Configuration
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 date.timezone = Asia/Ho_Chi_Minh
+
+; Performance
 max_execution_time = 600
 max_input_time = 600
-short_open_tag = On
-realpath_cache_size = ${PHP_REAL_PATH_LIMIT}
-realpath_cache_ttl = ${PHP_REAL_PATH_TTL}
 memory_limit = ${MAX_MEMORY}M
-upload_max_filesize = ${MAX_MEMORY}M
-post_max_size = ${MAX_MEMORY}M
+
+realpath_cache_size = ${PHP_REAL_PATH_LIMIT}
+realpath_cache_ttl  = ${PHP_REAL_PATH_TTL}
+
+; Upload
+upload_max_filesize = ${UPLOAD_MAX_FILESIZE}M
+post_max_size = ${POST_MAX_SIZE}M
+max_input_vars = ${MAX_INPUT_VARS}
+max_input_nesting_level = 128
+
+; Security
 expose_php = Off
 display_errors = Off
+log_errors = On
 mail.add_x_header = Off
-max_input_nesting_level = 128
-max_input_vars = ${MAX_INPUT_VARS}
-mysqlnd.net_cmd_buffer_size = 16384
+short_open_tag = Off
+cgi.fix_pathinfo = 0
+
+; Error handling
+error_reporting = E_ALL
+
+; MySQL Native Driver
 mysqlnd.collect_memory_statistics = Off
-mysqlnd.mempool_default_size = 16000
-always_populate_raw_post_data=-1
-error_reporting = E_ALL & ~E_NOTICE
-EOhostvn_custom_ini
 
-    if [ -f "$PHP1_CLI_PATH/00-hostvn-custom.ini" ]; then
-        rm -rf "$PHP1_CLI_PATH"/00-hostvn-custom.ini
-    fi
+; Opcache (recommended)
+opcache.enable=1
+opcache.memory_consumption=256
+opcache.interned_strings_buffer=16
+opcache.max_accelerated_files=100000
+opcache.validate_timestamps=1
+opcache.revalidate_freq=60
+EOF
 
-    cp "$PHP1_INI_PATH"/00-hostvn-custom.ini "$PHP1_CLI_PATH"/00-hostvn-custom.ini
+    # CLI config
+    rm -f "$PHP1_CLI_PATH/00-hostvn-custom.ini"
+    cp "$PHP1_INI_PATH/00-hostvn-custom.ini" \
+       "$PHP1_CLI_PATH/00-hostvn-custom.ini"
 }
 
 hostvn_custom_ini_2() {
-    cat >"$PHP2_INI_PATH/00-hostvn-custom.ini" <<EOhostvn_custom_ini_2
+
+    cat > "$PHP2_INI_PATH/00-hostvn-custom.ini" <<EOF
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; HOSTVN Custom PHP Configuration
+; PHP2
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 date.timezone = Asia/Ho_Chi_Minh
+
+; Performance
 max_execution_time = 600
 max_input_time = 600
-short_open_tag = On
-realpath_cache_size = ${PHP_REAL_PATH_LIMIT}
-realpath_cache_ttl = ${PHP_REAL_PATH_TTL}
 memory_limit = ${MAX_MEMORY}M
-upload_max_filesize = ${MAX_MEMORY}M
-post_max_size = ${MAX_MEMORY}M
+
+realpath_cache_size = ${PHP_REAL_PATH_LIMIT}
+realpath_cache_ttl  = ${PHP_REAL_PATH_TTL}
+
+; Upload
+upload_max_filesize = ${UPLOAD_MAX_FILESIZE}M
+post_max_size = ${POST_MAX_SIZE}M
+max_input_vars = ${MAX_INPUT_VARS}
+max_input_nesting_level = 128
+
+; Security
 expose_php = Off
 display_errors = Off
+log_errors = On
 mail.add_x_header = Off
-max_input_nesting_level = 128
-max_input_vars = ${MAX_INPUT_VARS}
-mysqlnd.net_cmd_buffer_size = 16384
+short_open_tag = Off
+cgi.fix_pathinfo = 0
+
+; Error handling
+error_reporting = E_ALL
+
+; MySQL Native Driver
 mysqlnd.collect_memory_statistics = Off
-mysqlnd.mempool_default_size = 16000
-always_populate_raw_post_data=-1
-error_reporting = E_ALL & ~E_NOTICE
-EOhostvn_custom_ini_2
 
-    if [ -f "$PHP2_CLI_PATH/00-hostvn-custom.ini" ]; then
-        rm -rf "$PHP2_CLI_PATH"/00-hostvn-custom.ini
-    fi
+; Opcache
+opcache.enable=1
+opcache.memory_consumption=256
+opcache.interned_strings_buffer=16
+opcache.max_accelerated_files=100000
+opcache.validate_timestamps=1
+opcache.revalidate_freq=60
+EOF
 
-    cp "$PHP2_INI_PATH"/00-hostvn-custom.ini "$PHP2_CLI_PATH"/00-hostvn-custom.ini
+    # CLI config
+    rm -f "$PHP2_CLI_PATH/00-hostvn-custom.ini"
+    cp "$PHP2_INI_PATH/00-hostvn-custom.ini" \
+       "$PHP2_CLI_PATH/00-hostvn-custom.ini"
 }
 
 # Config PHP Opcache
 php_opcache() {
+
     if [[ -f "$PHP1_INI_PATH/10-opcache.ini" ]]; then
-        mv "$PHP1_INI_PATH"/10-opcache.ini "$PHP1_INI_PATH"/10-opcache.ini."$(date +%Y-%m-%d)"
+        mv "$PHP1_INI_PATH/10-opcache.ini" \
+           "$PHP1_INI_PATH/10-opcache.ini.$(date +%Y-%m-%d)"
     fi
-    cat >"$PHP1_INI_PATH/10-opcache.ini" <<EOphp_opcache
-zend_extension=opcache.so
+
+    cat > "$PHP1_INI_PATH/10-opcache.ini" <<EOF
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+; OPcache Configuration ;
+; PHP1
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+zend_extension=opcache
+
 opcache.enable=1
-opcache.memory_consumption=${OPCACHE_MEM}
-opcache.interned_strings_buffer=8
-opcache.max_wasted_percentage=5
-opcache.max_accelerated_files=65407
-opcache.revalidate_freq=180
-opcache.fast_shutdown=0
 opcache.enable_cli=0
-opcache.save_comments=1
-opcache.enable_file_override=1
+
+opcache.memory_consumption=${OPCACHE_MEM}
+opcache.interned_strings_buffer=16
+opcache.max_accelerated_files=100000
+opcache.max_wasted_percentage=5
+
 opcache.validate_timestamps=1
-opcache.blacklist_filename=${PHP1_INI_PATH}/opcache-default.blacklist
-EOphp_opcache
+opcache.revalidate_freq=60
 
-    cat >"${PHP1_INI_PATH}/opcache-default.blacklist" <<EOopcache_blacklist
-/home/*/*/public_html/wp-content/plugins/backwpup/*
-/home/*/*/public_html/wp-content/plugins/duplicator/*
-/home/*/*/public_html/wp-content/plugins/updraftplus/*
-/home/*/*/public_html/wp-content/cache/*
-/home/*/*/public_html/storage/*
-EOopcache_blacklist
+opcache.save_comments=1
+opcache.load_comments=1
 
-    rm -rf "$PHP1_CLI_PATH"/10-opcache.ini
-    cp "$PHP1_INI_PATH"/10-opcache.ini "$PHP1_CLI_PATH"/10-opcache.ini
+opcache.jit=0
+opcache.jit_buffer_size=0
+EOF
+
+    rm -f "$PHP1_CLI_PATH/10-opcache.ini"
+    cp "$PHP1_INI_PATH/10-opcache.ini" \
+       "$PHP1_CLI_PATH/10-opcache.ini"
 }
 
 php_2_opcache() {
+
     if [[ -f "$PHP2_INI_PATH/10-opcache.ini" ]]; then
-        mv "$PHP2_INI_PATH"/10-opcache.ini "$PHP2_INI_PATH"/10-opcache.ini."$(date +%Y-%m-%d)"
+        mv "$PHP2_INI_PATH/10-opcache.ini" \
+           "$PHP2_INI_PATH/10-opcache.ini.$(date +%Y-%m-%d)"
     fi
-    cat >"$PHP2_INI_PATH/10-opcache.ini" <<EOphp_opcache
-zend_extension=opcache.so
+
+    cat > "$PHP2_INI_PATH/10-opcache.ini" <<EOF
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+; OPcache Configuration ;
+; PHP2
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+zend_extension=opcache
+
 opcache.enable=1
-opcache.memory_consumption=${OPCACHE_MEM}
-opcache.interned_strings_buffer=8
-opcache.max_wasted_percentage=5
-opcache.max_accelerated_files=65407
-opcache.revalidate_freq=180
-opcache.fast_shutdown=0
 opcache.enable_cli=0
-opcache.save_comments=1
-opcache.enable_file_override=1
+
+opcache.memory_consumption=${OPCACHE_MEM}
+opcache.interned_strings_buffer=16
+opcache.max_accelerated_files=100000
+opcache.max_wasted_percentage=5
+
 opcache.validate_timestamps=1
-opcache.blacklist_filename=${PHP2_INI_PATH}/opcache-default.blacklist
-EOphp_opcache
+opcache.revalidate_freq=60
 
-    cat >"${PHP2_INI_PATH}/opcache-default.blacklist" <<EOopcache_blacklist
-/home/*/*/public_html/wp-content/plugins/backwpup/*
-/home/*/*/public_html/wp-content/plugins/duplicator/*
-/home/*/*/public_html/wp-content/plugins/updraftplus/*
-/home/*/*/public_html/wp-content/cache/*
-/home/*/*/public_html/storage/*
-EOopcache_blacklist
+opcache.save_comments=1
+opcache.load_comments=1
 
-    rm -rf "$PHP2_CLI_PATH"/10-opcache.ini
-    cp "$PHP2_INI_PATH"/10-opcache.ini "$PHP2_CLI_PATH"/10-opcache.ini
+opcache.jit=0
+opcache.jit_buffer_size=0
+EOF
+
+    rm -f "$PHP2_CLI_PATH/10-opcache.ini"
+    cp "$PHP2_INI_PATH/10-opcache.ini" \
+       "$PHP2_CLI_PATH/10-opcache.ini"
 }
 
 # Config MariaDB
 config_my_cnf() {
+
     mkdir -p /var/log/mysql
     chown -R mysql:mysql /var/log/mysql
-#     mv /etc/mysql/my.cnf /etc/mysql/my.cnf."$(date +%Y-%m-%d)"
-
-#     cat >>"/etc/mysql/my.cnf" <<EOmy_cnf
-# [client]
-# port = 3306
-# socket = /run/mysqld/mysqld.sock
-# default-character-set = utf8mb4
-
-# [mysql]
-# max_allowed_packet = ${max_allowed_packet}
-
-# [mysqld]
-# port = 3306
-
-# local-infile=0
-# #ignore-db-dir=lost+found
-# init-connect = 'SET NAMES utf8mb4'
-# character-set-server = utf8mb4
-# #collation-server      = utf8mb4_unicode_ci
-# datadir=/var/lib/mysql
-# socket = /run/mysqld/mysqld.sock
-
-# #bind-address=127.0.0.1
-
-# tmpdir=/tmp
-
-# innodb=ON
-# #skip-federated
-# #skip-pbxt
-# #skip-pbxt_statistics
-# #skip-archive
-# #skip-name-resolve
-# #old_passwords
-# back_log = ${back_log}
-# max_connections = ${max_connections}
-# key_buffer_size = ${key_buffer_size}
-# myisam_sort_buffer_size = ${myisam_sort_buffer_size}
-# myisam_max_sort_file_size = ${myisam_max_sort_file_size}
-# join_buffer_size = ${join_buffer_size}
-# read_buffer_size = ${read_buffer_size}
-# sort_buffer_size = ${sort_buffer_size}
-# table_definition_cache = ${table_definition_cache}
-# table_open_cache = ${table_open_cache}
-# thread_cache_size = ${thread_cache_size}
-# wait_timeout = 1800
-# connect_timeout = 10
-# tmp_table_size = ${tmp_table_size}
-# max_heap_table_size = ${max_heap_table_size}
-# max_allowed_packet = ${max_allowed_packet}
-# #max_seeks_for_key = 4294967295
-# #group_concat_max_len = 1024
-# max_length_for_sort_data = 1024
-# net_buffer_length = ${net_buffer_length}
-# max_connect_errors = 100000
-# concurrent_insert = 2
-# read_rnd_buffer_size = ${read_rnd_buffer_size}
-# bulk_insert_buffer_size = 8M
-# # query_cache boost for MariaDB >10.1.2+
-# query_cache_limit = ${query_cache_limit}
-# query_cache_size = ${query_cache_size}
-# query_cache_type = 1
-# query_cache_min_res_unit = 2K
-# query_prealloc_size = 262144
-# query_alloc_block_size = 65536
-# transaction_alloc_block_size = 8192
-# transaction_prealloc_size = 4096
-# default-storage-engine = InnoDB
-# ft_min_word_len = 3
-# log_warnings=1
-# slow_query_log=0
-# long_query_time=1
-# slow_query_log_file=/var/lib/mysql/slowq.log
-# log-error=/var/log/mysql/mysqld.log
-
-# # innodb settings
-# #innodb_large_prefix=1
-# innodb_purge_threads=1
-# #innodb_file_format = Barracuda
-# innodb_file_per_table = 1
-# innodb_open_files = ${innodb_open_files}
-# innodb_data_file_path= ibdata1:10M:autoextend
-# innodb_buffer_pool_size = ${innodb_buffer_pool_size}
-# #open_files_limit=100000
-
-# ## https://mariadb.com/kb/en/mariadb/xtradbinnodb-server-system-variables/#innodb_buffer_pool_instances
-# #innodb_buffer_pool_instances=2
-
-# #innodb_log_files_in_group = 2
-# innodb_log_file_size = ${innodb_log_file_size}
-# innodb_log_buffer_size = ${innodb_log_buffer_size}
-# innodb_flush_log_at_trx_commit = 2
-# innodb_thread_concurrency = 0
-# innodb_lock_wait_timeout=50
-# innodb_flush_method = O_DIRECT
-# #innodb_support_xa=1
-
-# # 200 * # DISKS
-# innodb_io_capacity = ${innodb_io_capacity}
-# innodb_io_capacity_max = 2000
-# innodb_read_io_threads = ${innodb_read_io_threads}
-# innodb_write_io_threads = 2
-# innodb_flush_neighbors = 1
-
-# # mariadb settings
-# [mariadb]
-# #thread-handling = pool-of-threads
-# #thread-pool-size= 20
-# #mysql --port=3307 --protocol=tcp
-# #extra-port=3307
-# #extra-max-connections=1
-
-# userstat = 0
-# key_cache_segments = 1
-# aria_group_commit = none
-# aria_group_commit_interval = 0
-# aria_log_file_size = ${aria_log_file_size}
-# aria_log_purge_type = immediate
-# aria_pagecache_buffer_size = ${aria_pagecache_buffer_size}
-# aria_sort_buffer_size = ${aria_sort_buffer_size}
-
-# [mariadb-5.5]
-# innodb_file_format = Barracuda
-# innodb_file_per_table = 1
-
-# #ignore_db_dirs=
-# query_cache_strip_comments=0
-
-# innodb_read_ahead = linear
-# innodb_adaptive_flushing_method = estimate
-# innodb_flush_neighbor_pages = 1
-# innodb_stats_update_need_lock = 0
-# innodb_log_block_size = 512
-
-# log_slow_filter =admin,filesort,filesort_on_disk,full_join,full_scan,query_cache,query_cache_miss,tmp_table,tmp_table_on_disk
-
-# [mysqld_safe]
-# socket=/var/lib/mysql/mysql.sock
-# log-error=/var/log/mysqld/mysqld.log
-# #nice = -5
-# open-files-limit = 8192
-
-# [mysqldump]
-# quick
-# max_allowed_packet = ${max_allowed_packet}
-
-# [myisamchk]
-# tmpdir=/tmp
-# key_buffer = ${key_buffer}
-# sort_buffer = ${sort_buffer}
-# read_buffer = ${read_buffer}
-# write_buffer = ${write_buffer}
-
-# [mysqlhotcopy]
-# interactive-timeout
-
-# [mariadb-10.0]
-# innodb_file_format = Barracuda
-# innodb_file_per_table = 1
-
-# # 2 variables needed to switch from XtraDB to InnoDB plugins
-# #plugin-load=ha_innodb
-# #ignore_builtin_innodb
-
-# ## MariaDB 10 only save and restore buffer pool pages
-# ## warm up InnoDB buffer pool on server restarts
-# innodb_buffer_pool_dump_at_shutdown=1
-# innodb_buffer_pool_load_at_startup=1
-# innodb_buffer_pool_populate=0
-# ## Disabled settings
-# performance_schema=OFF
-# innodb_stats_on_metadata=OFF
-# innodb_sort_buffer_size=2M
-# innodb_online_alter_log_max_size=128M
-# query_cache_strip_comments=0
-# log_slow_filter =admin,filesort,filesort_on_disk,full_join,full_scan,query_cache,query_cache_miss,tmp_table,tmp_table_on_disk
-# EOmy_cnf
+    chmod 750 /var/log/mysql
 
     sql_root_pass=$(gen_pass)
     sql_admin_pass=$(gen_pass)
 
-    systemctl start mariadb
+    systemctl daemon-reload
     systemctl enable mariadb
+    systemctl start mariadb
 
-    mysql_secure_installation <<EOF
+    # Đợi MariaDB sẵn sàng
+    for i in {1..20}; do
+        mariadb-admin ping >/dev/null 2>&1 && break
+        sleep 1
+    done
 
-n
-y
-${sql_root_pass}
-${sql_root_pass}
-y
-y
-y
-y
+    # Đặt mật khẩu root + hardening (KHÔNG dùng mysql_secure_installation)
+    mariadb <<EOF
+ALTER USER 'root'@'localhost' IDENTIFIED BY '${sql_root_pass}';
+DELETE FROM mysql.user WHERE User='';
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
+FLUSH PRIVILEGES;
 EOF
 
-    Q1="CREATE USER 'admin'@'localhost' IDENTIFIED BY '${sql_admin_pass}';"
-    Q2="GRANT ALL PRIVILEGES ON *.* TO 'admin'@'localhost' WITH GRANT OPTION;"
-    Q3="FLUSH PRIVILEGES;"
-    SQL="${Q1}${Q2}${Q3}"
-    mariadb -uroot -p"${sql_root_pass}" -e "${SQL}"
+    # Tạo user admin (KHÔNG cấp SUPER / GRANT OPTION)
+    mariadb -uroot -p"${sql_root_pass}" <<EOF
+CREATE USER IF NOT EXISTS 'admin'@'localhost'
+IDENTIFIED BY '${sql_admin_pass}';
 
-    if [ -f "/usr/lib/systemd/system/mariadb.service" ]; then
-        sed -i "s/LimitNOFILE=.*/LimitNOFILE=655350/g" /usr/lib/systemd/system/mariadb.service
-        sed -i "s/PrivateTmp=false/PrivateTmp=true/g" /usr/lib/systemd/system/mariadb.service
-        systemctl daemon-reload
-    fi
+GRANT ALL PRIVILEGES ON *.* TO 'admin'@'localhost'
+REQUIRE NONE;
 
-    if [[ -f "/lib/systemd/system/mariadb.service" && ! -f "/usr/lib/systemd/system/mariadb.service" ]]; then
-        sed -i "s/LimitNOFILE=.*/LimitNOFILE=655350/g" /lib/systemd/system/mariadb.service
-        sed -i "s/PrivateTmp=false/PrivateTmp=true/g" /lib/systemd/system/mariadb.service
-        systemctl daemon-reload
-    fi
+FLUSH PRIVILEGES;
+EOF
+
+    # systemd override (CHUẨN)
+    mkdir -p /etc/systemd/system/mariadb.service.d
+
+    cat > /etc/systemd/system/mariadb.service.d/override.conf <<EOF
+[Service]
+LimitNOFILE=655350
+PrivateTmp=true
+EOF
+
+    systemctl daemon-reexec
+    systemctl daemon-reload
+    systemctl restart mariadb
+
 }
 
 ############################################
 # Change SSH Port
 ############################################
 change_ssh_port() {
-    sed -i "s/#Port 22/Port ${SSH_PORT}/g" /etc/ssh/sshd_config
+
+    if [[ -z "${SSH_PORT}" ]]; then
+        echo "SSH_PORT is empty"
+        return 1
+    fi
+
+    if [[ "${SSH_PORT}" -lt 1024 || "${SSH_PORT}" -gt 65535 ]]; then
+        echo "Invalid SSH port: ${SSH_PORT}"
+        return 1
+    fi
+
+    SSHD_CONF="/etc/ssh/sshd_config"
+
+    cp "${SSHD_CONF}" "${SSHD_CONF}.$(date +%Y-%m-%d)"
+
+    # Xoá toàn bộ dòng Port cũ
+    sed -i '/^[#[:space:]]*Port[[:space:]]\+/d' "${SSHD_CONF}"
+
+    # Thêm Port mới ở cuối file
+    echo "Port ${SSH_PORT}" >> "${SSHD_CONF}"
+
+    # Test cấu hình trước khi restart
+    if ! sshd -t; then
+        echo "sshd config test failed"
+        mv "${SSHD_CONF}.$(date +%Y-%m-%d)" "${SSHD_CONF}"
+        return 1
+    fi
+
+    systemctl reload sshd
 }
 
 ############################################
 # Install ACME
 ############################################
 install_acme() {
-    curl -sSL https://get.acme.sh | sh -s -- --accountemail "${ADMIN_EMAIL}"
 
-    # Tạo symlink để dễ gọi acme.sh
-    if [ -f "/root/.acme.sh/acme.sh" ]; then
-        ln -sf /root/.acme.sh/acme.sh /usr/local/bin/acme.sh
+    if [[ -x "/root/.acme.sh/acme.sh" ]]; then
+        echo "acme.sh already installed"
+    else
+        curl -sSL https://get.acme.sh | sh -s -- \
+            --accountemail "${ADMIN_EMAIL}"
     fi
+
+    # symlink
+    ln -sf /root/.acme.sh/acme.sh /usr/local/bin/acme.sh
+
+    # set Let's Encrypt làm CA mặc định
+    /usr/local/bin/acme.sh --set-default-ca --server letsencrypt
+
+    # bật auto upgrade
+    /usr/local/bin/acme.sh --upgrade --auto-upgrade
 }
 
 ############################################
