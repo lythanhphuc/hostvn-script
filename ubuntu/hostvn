@@ -2587,7 +2587,7 @@ install_acme() {
     else
         echo "[INFO] Installing acme.sh..."
 
-        curl -sSL https://get.acme.sh | sh -s -- \
+        curl -sSL https://get.acme.sh | sh -s \
             --accountemail "${ADMIN_EMAIL}" || {
                 echo "[ERROR] acme.sh install failed"
                 return 1
