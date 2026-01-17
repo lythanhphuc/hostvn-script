@@ -2224,7 +2224,7 @@ php_value[session.save_path] = /var/lib/php/sessions
 php_value[soap.wsdl_cache_dir] = /var/lib/php/wsdlcache
 
 php_admin_value[disable_functions] = exec,system,passthru,shell_exec,proc_open,popen,show_source,dl
-php_admin_value[open_basedir] = /usr/share/nginx:/var/www:/tmp:/var/tmp:/dev/urandom:/usr/share/php:/dev/shm:/var/lib/php
+php_admin_value[open_basedir] = /usr/share/nginx/:/tmp/:/var/tmp/:/dev/urandom:/usr/share/php/:/dev/shm:/var/lib/php/sessions/:/usr/share/doc:/var/www/:/usr/local/apache2/htdocs/
 
 security.limit_extensions = .php
 EOF
@@ -2508,54 +2508,37 @@ config_my_cnf() {
 
     mkdir -p /var/log/mysql
     chown -R mysql:mysql /var/log/mysql
-    chmod 750 /var/log/mysql
 
-    sql_root_pass=$(gen_pass)
     sql_admin_pass=$(gen_pass)
 
-    systemctl daemon-reload
     systemctl enable mariadb
     systemctl start mariadb
 
-    # Đợi MariaDB sẵn sàng
-    for i in {1..20}; do
-        mariadb-admin ping >/dev/null 2>&1 && break
-        sleep 1
-    done
-
-    # Đặt mật khẩu root + hardening (KHÔNG dùng mysql_secure_installation)
+    # tạo admin user bằng socket root
     mariadb <<EOF
-ALTER USER 'root'@'localhost' IDENTIFIED BY '${sql_root_pass}';
-DELETE FROM mysql.user WHERE User='';
-DROP DATABASE IF EXISTS test;
-DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
-FLUSH PRIVILEGES;
-EOF
-
-    # Tạo user admin (KHÔNG cấp SUPER / GRANT OPTION)
-    mariadb -uroot -p"${sql_root_pass}" <<EOF
 CREATE USER IF NOT EXISTS 'admin'@'localhost'
 IDENTIFIED BY '${sql_admin_pass}';
 
 GRANT ALL PRIVILEGES ON *.* TO 'admin'@'localhost'
-REQUIRE NONE;
+WITH GRANT OPTION;
 
 FLUSH PRIVILEGES;
 EOF
 
-    # systemd override (CHUẨN)
-    mkdir -p /etc/systemd/system/mariadb.service.d
+    # lưu password nếu cần
+    echo "MariaDB admin password: ${sql_admin_pass}" >> /root/.db_pass
 
-    cat > /etc/systemd/system/mariadb.service.d/override.conf <<EOF
-[Service]
-LimitNOFILE=655350
-PrivateTmp=true
-EOF
+    # systemd limits
+    for svc in \
+        /usr/lib/systemd/system/mariadb.service \
+        /lib/systemd/system/mariadb.service
+    do
+        [[ -f \$svc ]] || continue
+        sed -i 's/^LimitNOFILE=.*/LimitNOFILE=655350/' \$svc
+        sed -i 's/^PrivateTmp=.*/PrivateTmp=true/' \$svc
+    done
 
-    systemctl daemon-reexec
     systemctl daemon-reload
-    systemctl restart mariadb
-
 }
 
 ############################################
@@ -2598,14 +2581,26 @@ change_ssh_port() {
 ############################################
 install_acme() {
 
+    # kiểm tra đã cài chưa
     if [[ -x "/root/.acme.sh/acme.sh" ]]; then
-        echo "acme.sh already installed"
+        echo "[OK] acme.sh already installed"
     else
+        echo "[INFO] Installing acme.sh..."
+
         curl -sSL https://get.acme.sh | sh -s -- \
-            --accountemail "${ADMIN_EMAIL}"
+            --accountemail "${ADMIN_EMAIL}" || {
+                echo "[ERROR] acme.sh install failed"
+                return 1
+            }
     fi
 
-    # symlink
+    # đảm bảo file tồn tại
+    if [[ ! -x "/root/.acme.sh/acme.sh" ]]; then
+        echo "[ERROR] acme.sh not found after install"
+        return 1
+    fi
+
+    # tạo symlink
     ln -sf /root/.acme.sh/acme.sh /usr/local/bin/acme.sh
 
     # set Let's Encrypt làm CA mặc định
@@ -2613,6 +2608,8 @@ install_acme() {
 
     # bật auto upgrade
     /usr/local/bin/acme.sh --upgrade --auto-upgrade
+
+    echo "[OK] acme.sh installed & configured"
 }
 
 ############################################
@@ -3564,9 +3561,9 @@ install_phpmyadmin
 install_composer
 install_wp_cli
 
-install_optipng
-install_jpegoptim
-install_pngquant
+#install_optipng
+#install_jpegoptim
+#install_pngquant
 
 install_acme
 gen_htpasswd
