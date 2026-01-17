@@ -2509,7 +2509,8 @@ config_my_cnf() {
     mkdir -p /var/log/mysql
     chown -R mysql:mysql /var/log/mysql
 
-    sql_admin_pass=$(gen_pass)
+    sql_root_pass=$(gen_pass)
+	sql_admin_pass=$(gen_pass)
 
     systemctl enable mariadb
     systemctl start mariadb
