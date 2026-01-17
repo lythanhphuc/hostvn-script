@@ -41,7 +41,6 @@ PHPMYADMIN_VERSION=$(curl -s ${UPDATE_LINK}/version | grep "phpmyadmin_version="
 MARIADB_VERSION=$(curl -s ${UPDATE_LINK}/version | grep "mariadb_version=" | cut -f2 -d'=')
 # shellcheck disable=SC2207
 PHP_LIST=($(curl -s https://raw.githubusercontent.com/lythanhphuc/hostvn-script/master/ubuntu/update/version | grep "php_list=" | cut -f2 -d'='))
-DEFAULT_PHP="8.3"
 
 # Set Lang
 OPTION_CHANGE_SSH="Ban co muon thay doi port SSH khong ? "
