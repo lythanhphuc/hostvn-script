@@ -32,7 +32,7 @@ curl -sO https://raw.githubusercontent.com/lythanhphuc/hostvn-script/master/inst
 - Cài đặt các phần mềm với phiên bản mới nhất từ chính trang chủ.
 - Mariadb: 11.8.
 - Phiên bản Nginx Stable.
-- Cho phép lựa chọn phiên bản PHP từ 5.6, đến 8.4
+- Cho phép lựa chọn phiên bản PHP từ 5.6, đến 8.3
 - phpMyAdmin 4.9.x nếu cài đặt PHP mặc định là 5.6, phpMyAdmin 5.2.x nếu cài đặt PHP mặc định là 8.x.
 - Cấu hình Nginx FastCGI cache
 - Cấu hình Nginx Pagespeed
