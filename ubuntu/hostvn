@@ -385,18 +385,16 @@ install_mariadb() {
     systemctl restart mariadb
 }
 
-add_php_repo() {
-    apt-get update -y
-    apt-get install -y software-properties-common ca-certificates lsb-release
-
-    add-apt-repository -y ppa:ondrej/php
-    apt-get update -y
-}
-
 install_php() {
     export DEBIAN_FRONTEND=noninteractive
 
     echo "=== Cai dat PHP ${PHP_VERSION} ==="
+	
+	apt-get update -y
+    apt-get install -y software-properties-common ca-certificates lsb-release
+
+    add-apt-repository -y ppa:ondrej/php
+    apt-get update -y
 
     apt-get install -y \
         php${PHP_VERSION} \
@@ -2339,8 +2337,8 @@ realpath_cache_size = ${PHP_REAL_PATH_LIMIT}
 realpath_cache_ttl  = ${PHP_REAL_PATH_TTL}
 
 ; Upload
-upload_max_filesize = ${UPLOAD_MAX_FILESIZE}M
-post_max_size = ${POST_MAX_SIZE}M
+upload_max_filesize = ${MAX_MEMORY}M
+post_max_size = ${MAX_MEMORY}M
 max_input_vars = ${MAX_INPUT_VARS}
 max_input_nesting_level = 128
 
@@ -2392,8 +2390,8 @@ realpath_cache_size = ${PHP_REAL_PATH_LIMIT}
 realpath_cache_ttl  = ${PHP_REAL_PATH_TTL}
 
 ; Upload
-upload_max_filesize = ${UPLOAD_MAX_FILESIZE}M
-post_max_size = ${POST_MAX_SIZE}M
+upload_max_filesize = ${MAX_MEMORY}M
+post_max_size = ${MAX_MEMORY}M
 max_input_vars = ${MAX_INPUT_VARS}
 max_input_nesting_level = 128
 
@@ -3531,7 +3529,6 @@ self_signed_ssl
 
 install_nginx
 install_mariadb
-add_php_repo
 install_php
 
 if [[ "${MULTI_PHP}" =~ ^(Y|y)$ ]]; then
