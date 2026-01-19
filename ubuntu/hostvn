@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 ######################################################################
@@ -932,7 +931,7 @@ install_optipng(){
 install_jpegoptim(){
     jpegoptim_version=$(curl -s ${UPDATE_LINK}/version | grep "jpegoptim_version=" | cut -f2 -d'=')
     cd_dir /opt
-    wget -O- https://github.com/tjko/jpegoptim/archive/refs/tags/v"${optipng_version}".tar.gz | tar -xz
+    wget -O- https://github.com/tjko/jpegoptim/archive/refs/tags/v"${jpegoptim_version}".tar.gz | tar -xz
     cd_dir jpegoptim-"${jpegoptim_version}"
     ./configure
     make && make strip && make install
