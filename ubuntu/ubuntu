@@ -20,7 +20,7 @@ rm -rf ubuntu
 DIR=$(pwd)
 
 # Set link
-SCRIPT_LINK="https://script.ltp.io.vn/ubuntu"
+SCRIPT_LINK="https://raw.githubusercontent.com/lythanhphuc/hostvn-script/refs/heads/master/ubuntu"
 
 welcome(){
     clear
