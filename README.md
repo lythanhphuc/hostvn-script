@@ -16,7 +16,7 @@ Script được viết bằng shell dùng để cài đặt LEMP Stack (Nginx - 
 ## 1. Yêu cầu
 
 - VPS tối thiểu 512MB ram và chưa cài đặt bất kỳ dịch vụ nào.
-- Ubuntu 22.04, 24.04.
+- Ubuntu 24.04.
 
 ## 2. Cách cài đặt
 
