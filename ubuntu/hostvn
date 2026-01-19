@@ -20,12 +20,12 @@ DIR=$(pwd)
 RED='\033[0;31m'
 NC='\033[0m'
 
-SCRIPTS_VERSION="0.2.9"
+SCRIPTS_VERSION="0.3.0"
 IPADDRESS=$(curl -s https://checkip.amazonaws.com)
 DIR=$(pwd)
 BASH_DIR="/var/hostvn"
 GITHUB_RAW_LINK="https://raw.githubusercontent.com"
-EXT_LINK="https://script.ltp.io.vn"
+EXT_LINK="https://raw.githubusercontent.com/lythanhphuc/hostvn-script/refs/heads/master"
 UPDATE_LINK="${EXT_LINK}/ubuntu/update"
 FILE_INFO="${BASH_DIR}/.hostvn.conf"
 HOSTNAME=$(hostname)
@@ -39,7 +39,7 @@ AUTHOR_CONTACT="https://www.facebook.com/groups/hostvn.vn"
 PHPMYADMIN_VERSION=$(curl -s ${UPDATE_LINK}/version | grep "phpmyadmin_version=" | cut -f2 -d'=')
 MARIADB_VERSION=$(curl -s ${UPDATE_LINK}/version | grep "mariadb_version=" | cut -f2 -d'=')
 # shellcheck disable=SC2207
-PHP_LIST=($(curl -s https://script.ltp.io.vn/ubuntu/update/version | grep "php_list=" | cut -f2 -d'='))
+PHP_LIST=($(curl -s https://raw.githubusercontent.com/lythanhphuc/hostvn-script/refs/heads/master/ubuntu/update/version | grep "php_list=" | cut -f2 -d'='))
 
 # Set Lang
 OPTION_CHANGE_SSH="Ban co muon thay doi port SSH khong ? "
@@ -277,7 +277,7 @@ check_duplicate_php() {
 install_nginx(){
     apt-get install -y build-essential zlib1g-dev libpcre2-dev unzip uuid-dev libbrotli-dev
     apt autoremove -y
-    UPDATE_LINK="https://script.ltp.io.vn/ubuntu/update"
+    UPDATE_LINK="https://raw.githubusercontent.com/lythanhphuc/hostvn-script/refs/heads/master/ubuntu/update"
     MODULE_PATH="/usr/share/nginx_module"
     mkdir -p "${MODULE_PATH}"
     NGINX_VERSION=$(curl -s ${UPDATE_LINK}/version | grep "nginx_version=" | cut -f2 -d'=')
@@ -961,7 +961,7 @@ mariadb_calculation() {
 install_optipng(){
     optipng_version=$(curl -s ${UPDATE_LINK}/version | grep "optipng_version=" | cut -f2 -d'=')
     cd_dir /opt
-	wget -O- https://script.ltp.io.vn/ubuntu/modules/optipng-"${optipng_version}".tar.gz | tar -xz
+	wget -O- https://raw.githubusercontent.com/lythanhphuc/hostvn-script/refs/heads/master/ubuntu/modules/optipng-"${optipng_version}".tar.gz | tar -xz
     cd_dir optipng-"${optipng_version}"
     ./configure
     make
