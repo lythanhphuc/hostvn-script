@@ -2597,7 +2597,7 @@ change_ssh_port() {
 # Install ACME
 ############################################
 install_acme() {
-    curl -sSL https://get.acme.sh | sh -s -- --accountemail "${ADMIN_EMAIL}"
+    curl -sSL https://get.acme.sh | sh -s --accountemail "${ADMIN_EMAIL}"
 
     # Tạo symlink để dễ gọi acme.sh
     if [ -f "/root/.acme.sh/acme.sh" ]; then
