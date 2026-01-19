@@ -26,7 +26,7 @@ fi
 
 ARCH=$(uname -m)
 
-SCRIPT_LINK="https://raw.githubusercontent.com/lythanhphuc/hostvn-script/master/${OS}"
+SCRIPT_LINK="https://script.ltp.io.vn/${OS}"
 OS_LIST="ubuntu"
 RAM_TOTAL=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
 LOW_RAM='400000'
