@@ -12,7 +12,7 @@
 ######################################################################
 
 OS_VER=$(grep -w "VERSION_ID=" "/etc/os-release" | cut -f2 -d'=' | cut -f2 -d'"')
-LIST_OS_VER_SUPPORT=('24.04')
+LIST_OS_VER_SUPPORT=('22.04' '24.04')
 ARCH=$(uname -m)
 
 rm -rf ubuntu
@@ -34,7 +34,6 @@ welcome(){
     sleep 3
 }
 
-export DEBIAN_FRONTEND=noninteractive
 apt update -y
 apt upgrade -y
 apt autoremove -y
@@ -53,10 +52,7 @@ fixed_lock_frontend(){
 
 # Remove unnecessary services
 remove_old_service(){
-    apt-get -y purge mysql-server mysql-client mariadb-server mariadb-client \
-    apache2 apache2-utils apache2-bin apache2.2-common \
-    nginx nginx-common nginx-core \
-    php-fpm php-cli php-common
+    apt-get -y remove mysql* mariadb* php* apache2* postfix* rsyslog* nginx* fail2ban
     rm -rf /etc/nginx/nginx.conf /etc/nginx/alias /etc/nginx/rewrite /etc/nginx/ssl /etc/nginx/wordpress
     rm -rf /etc/nginx/apps /etc/nginx/extra /etc/nginx/pagespeed /etc/nginx/redirect /etc/nginx/rocket-nginx
     rm -rf /etc/nginx/web_apps.conf
@@ -96,30 +92,42 @@ set_dns_server(){
 }
 
 create_source_list(){
-    if [ "${OS_VER}" == "24.04" ]; then
-        echo "Dang cau hinh apt source cho Ubuntu 24.04 Noble..."
-
-        if [[ -f /etc/apt/sources.list ]]; then
-            mv /etc/apt/sources.list /etc/apt/sources.list.bak.$(date +%F)
-        fi
-
+    if [ "${OS_VER}" == "22.04" ]; then
+        mv /etc/apt/sources.list /etc/apt/sources.list."$(date +%Y-%m-%d)"
         if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
-cat > /etc/apt/sources.list <<EOF
+cat >> "/etc/apt/sources.list" << EOsource_list
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-backports main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse
+EOsource_list
+        else
+cat >> "/etc/apt/sources.list" << EOsource_list
+deb http://archive.ubuntu.com/ubuntu jammy main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu jammy-updates main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu jammy-backports main restricted universe multiverse
+deb http://security.ubuntu.com/ubuntu jammy-security main restricted universe multiverse
+EOsource_list
+        fi
+        apt update -y
+    fi
+    if [ "${OS_VER}" == "24.04" ]; then
+        mv /etc/apt/sources.list /etc/apt/sources.list."$(date +%Y-%m-%d)"
+        if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
+cat >> "/etc/apt/sources.list" << EOsource_list
 deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse
 deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-updates main restricted universe multiverse
 deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-backports main restricted universe multiverse
 deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-security main restricted universe multiverse
-EOF
+EOsource_list
         else
-cat > /etc/apt/sources.list <<EOF
+cat >> "/etc/apt/sources.list" << EOsource_list
 deb http://archive.ubuntu.com/ubuntu noble main restricted universe multiverse
 deb http://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
 deb http://archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse
 deb http://security.ubuntu.com/ubuntu noble-security main restricted universe multiverse
-EOF
+EOsource_list
         fi
-
-        apt clean
         apt update -y
     fi
 }
@@ -130,11 +138,11 @@ install_requirement() {
     apt-get upgrade -y
 
     apt-get install -y \
-    curl wget git software-properties-common lsb-release ca-certificates zip unzip \
-    build-essential gcc g++ make cmake autoconf automake pkg-config libtool \
-    zlib1g-dev libpcre3 libpcre3-dev libxml2-dev libcurl4-openssl-dev \
-    libjpeg-turbo8-dev libpng-dev libfreetype6-dev libzip-dev libicu-dev \
-    libsqlite3-dev libxslt-dev
+        curl wget git software-properties-common lsb-release ca-certificates zip unzip \
+        build-essential gcc g++ make cmake autoconf automake pkg-config libtool \
+        zlib1g-dev libpcre3 libpcre3-dev libssl-dev libxml2-dev libcurl4-openssl-dev \
+        libjpeg-turbo8-dev libpng-dev libfreetype6-dev libzip-dev libicu-dev \
+        libsqlite3-dev libxslt-dev
 }
 
 create_swap(){
