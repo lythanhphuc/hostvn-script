@@ -25,7 +25,7 @@ IPADDRESS=$(curl -s https://checkip.amazonaws.com)
 DIR=$(pwd)
 BASH_DIR="/var/hostvn"
 GITHUB_RAW_LINK="https://raw.githubusercontent.com"
-EXT_LINK="https://raw.githubusercontent.com/lythanhphuc/hostvn-script/master"
+EXT_LINK="https://script.ltp.io.vn"
 UPDATE_LINK="${EXT_LINK}/ubuntu/update"
 FILE_INFO="${BASH_DIR}/.hostvn.conf"
 HOSTNAME=$(hostname)
@@ -39,7 +39,7 @@ AUTHOR_CONTACT="https://www.facebook.com/groups/hostvn.vn"
 PHPMYADMIN_VERSION=$(curl -s ${UPDATE_LINK}/version | grep "phpmyadmin_version=" | cut -f2 -d'=')
 MARIADB_VERSION=$(curl -s ${UPDATE_LINK}/version | grep "mariadb_version=" | cut -f2 -d'=')
 # shellcheck disable=SC2207
-PHP_LIST=($(curl -s https://raw.githubusercontent.com/lythanhphuc/hostvn-script/master/ubuntu/update/version | grep "php_list=" | cut -f2 -d'='))
+PHP_LIST=($(curl -s https://script.ltp.io.vn/ubuntu/update/version | grep "php_list=" | cut -f2 -d'='))
 
 # Set Lang
 OPTION_CHANGE_SSH="Ban co muon thay doi port SSH khong ? "
@@ -277,7 +277,7 @@ check_duplicate_php() {
 install_nginx(){
     apt-get install -y build-essential zlib1g-dev libpcre2-dev unzip uuid-dev libbrotli-dev
     apt autoremove -y
-    UPDATE_LINK="https://raw.githubusercontent.com/lythanhphuc/hostvn-script/master/ubuntu/update"
+    UPDATE_LINK="https://script.ltp.io.vn/ubuntu/update"
     MODULE_PATH="/usr/share/nginx_module"
     mkdir -p "${MODULE_PATH}"
     NGINX_VERSION=$(curl -s ${UPDATE_LINK}/version | grep "nginx_version=" | cut -f2 -d'=')
@@ -961,7 +961,7 @@ mariadb_calculation() {
 install_optipng(){
     optipng_version=$(curl -s ${UPDATE_LINK}/version | grep "optipng_version=" | cut -f2 -d'=')
     cd_dir /opt
-	wget -O- https://raw.githubusercontent.com/lythanhphuc/hostvn-script/master/ubuntu/modules/optipng-"${optipng_version}".tar.gz | tar -xz
+	wget -O- https://script.ltp.io.vn/ubuntu/modules/optipng-"${optipng_version}".tar.gz | tar -xz
     cd_dir optipng-"${optipng_version}"
     ./configure
     make
@@ -1041,7 +1041,7 @@ create_nginx_conf() {
     cat > /etc/nginx/nginx.conf <<'EONGINXCONF'
 user nginx;
 worker_processes auto;
-worker_rlimit_nofile 260000;
+worker_rlimit_nofile 100000;
 
 error_log /var/log/nginx/error.log warn;
 pid /run/nginx.pid;
@@ -1053,77 +1053,72 @@ events {
 }
 
 http {
-    index  index.html index.htm index.php;
     include       /etc/nginx/mime.types;
     default_type  application/octet-stream;
+
     charset utf-8;
+    index index.html index.htm index.php;
 
-    log_format  main  '\$remote_addr - \$remote_user [\$time_local] "\$request" '
-                  '\$status \$body_bytes_sent "\$http_referer" '
-                  '"\$http_user_agent" "\$http_x_forwarded_for"';
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent"';
 
-    access_log  off;
+    access_log /var/log/nginx/access.log main;
     server_tokens off;
 
     sendfile on;
-
     tcp_nopush on;
-    tcp_nodelay off;
+    tcp_nodelay on;
+
+    keepalive_timeout 15;
+    reset_timedout_connection on;
+    send_timeout 60s;
 
     types_hash_max_size 2048;
     server_names_hash_bucket_size 128;
     server_names_hash_max_size 10240;
+
     client_max_body_size 1024m;
     client_body_buffer_size 128k;
-    client_body_in_file_only off;
     client_body_timeout 60s;
+    client_header_timeout 20s;
     client_header_buffer_size 256k;
-    client_header_timeout  20s;
     large_client_header_buffers 8 256k;
-    keepalive_timeout 15;
-    keepalive_disable msie6;
-    reset_timedout_connection on;
-    send_timeout 60s;
 
-    disable_symlinks if_not_owner from=\$document_root;
-    server_name_in_redirect off;
-
-    open_file_cache max=2000 inactive=20s;
+    open_file_cache max=5000 inactive=30s;
     open_file_cache_valid 120s;
     open_file_cache_min_uses 2;
     open_file_cache_errors off;
 
-    # Limit Request
-    limit_req_status 403;
-    # limit the number of connections per single IP
+    # Connection & Request Limit
     limit_conn_zone $binary_remote_addr zone=conn_limit_per_ip:10m;
-    # limit the number of requests for a given session
-    limit_req_zone $binary_remote_addr zone=req_limit_per_ip:10m rate=1r/s;
+    limit_req_zone  $binary_remote_addr zone=req_limit_per_ip:10m rate=5r/s;
+    limit_req_status 429;
 
-    # Custom Response Headers
-    more_set_headers 'X-Content-Type-Options    "nosniff" always';
-    more_set_headers 'X-XSS-Protection          "1; mode=block" always';
-    more_set_headers 'Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always';
-    more_set_headers 'Referrer-Policy no-referrer-when-downgrade';
-    
-    # Custom Variables
+    # Security Headers (native)
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+
+    # Variables
     map $scheme $https_suffix {
-		default '';
-		https   '-https';
-	}
+        default '';
+        https '-https';
+    }
 
-    include /etc/nginx/extra/nginx_cache.conf;
+    # Includes
     include /etc/nginx/extra/gzip.conf;
-    #include /etc/nginx/extra/brotli.conf;
     include /etc/nginx/extra/ssl.conf;
     include /etc/nginx/extra/cloudflare.conf;
+    include /etc/nginx/php/*.conf;
     include /etc/nginx/web_apps.conf;
     include /etc/nginx/conf.d/*.conf;
     include /etc/nginx/redirect/*.conf;
 }
 EONGINXCONF
 
-	# Replace MAX_CLIENT placeholder
+    # Replace MAX_CLIENT placeholder
     sed -i "s/__MAX_CLIENT__/${MAX_CLIENT}/g" /etc/nginx/nginx.conf
 }
 
