@@ -1047,11 +1047,9 @@ error_log /var/log/nginx/error.log warn;
 pid /run/nginx.pid;
 
 events {
-    worker_connections ${MAX_CLIENT};
-    accept_mutex off;
-    accept_mutex_delay 200ms;
+    worker_connections __MAX_CLIENT__;
     use epoll;
-    #multi_accept on;
+    multi_accept on;
 }
 
 http {
@@ -1121,6 +1119,9 @@ http {
     include /etc/nginx/redirect/*.conf;
 }
 EONGINXCONF
+
+	# Replace MAX_CLIENT placeholder
+    sed -i "s/__MAX_CLIENT__/${MAX_CLIENT}/g" /etc/nginx/nginx.conf
 }
 
 _create_mod_security_config() {
