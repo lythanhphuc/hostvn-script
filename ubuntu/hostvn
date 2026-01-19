@@ -1055,66 +1055,67 @@ events {
 }
 
 http {
+    index  index.html index.htm index.php;
     include       /etc/nginx/mime.types;
     default_type  application/octet-stream;
-
     charset utf-8;
-    index index.html index.htm index.php;
 
-    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
-                    '$status $body_bytes_sent "$http_referer" '
-                    '"$http_user_agent"';
+    log_format  main  '\$remote_addr - \$remote_user [\$time_local] "\$request" '
+                  '\$status \$body_bytes_sent "\$http_referer" '
+                  '"\$http_user_agent" "\$http_x_forwarded_for"';
 
-	access_log  off;
+    access_log  off;
     server_tokens off;
 
     sendfile on;
-	
+
     tcp_nopush on;
     tcp_nodelay off;
-
-    keepalive_timeout 15;
-    reset_timedout_connection on;
-    send_timeout 60s;
 
     types_hash_max_size 2048;
     server_names_hash_bucket_size 128;
     server_names_hash_max_size 10240;
-
     client_max_body_size 1024m;
     client_body_buffer_size 128k;
+    client_body_in_file_only off;
     client_body_timeout 60s;
-    client_header_timeout 20s;
     client_header_buffer_size 256k;
+    client_header_timeout  20s;
     large_client_header_buffers 8 256k;
+    keepalive_timeout 15;
+    keepalive_disable msie6;
+    reset_timedout_connection on;
+    send_timeout 60s;
+
+    disable_symlinks if_not_owner from=\$document_root;
+    server_name_in_redirect off;
 
     open_file_cache max=2000 inactive=20s;
     open_file_cache_valid 120s;
     open_file_cache_min_uses 2;
     open_file_cache_errors off;
 
-    # Connection & Request Limit
-    limit_conn_zone $binary_remote_addr zone=conn_limit_per_ip:10m;
-    limit_req_zone  $binary_remote_addr zone=req_limit_per_ip:10m rate=1r/s;
+    # Limit Request
     limit_req_status 403;
+    # limit the number of connections per single IP
+    limit_conn_zone \$binary_remote_addr zone=conn_limit_per_ip:10m;
+    # limit the number of requests for a given session
+    limit_req_zone \$binary_remote_addr zone=req_limit_per_ip:10m rate=1r/s;
 
-    # Security Headers (native)
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy no-referrer-when-downgrade;
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+    # Custom Response Headers
+    more_set_headers 'X-Content-Type-Options    "nosniff" always';
+    more_set_headers 'X-XSS-Protection          "1; mode=block" always';
+    more_set_headers 'Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always';
+    more_set_headers 'Referrer-Policy no-referrer-when-downgrade';
+    
+    # Custom Variables
+    map \$scheme \$https_suffix { default ''; https '-https'; }
 
-    # Variables
-    map $scheme $https_suffix {
-        default '';
-        https '-https';
-    }
-
-    # Includes
+    include /etc/nginx/extra/nginx_cache.conf;
     include /etc/nginx/extra/gzip.conf;
+    #include /etc/nginx/extra/brotli.conf;
     include /etc/nginx/extra/ssl.conf;
     include /etc/nginx/extra/cloudflare.conf;
-    include /etc/nginx/php/*.conf;
     include /etc/nginx/web_apps.conf;
     include /etc/nginx/conf.d/*.conf;
     include /etc/nginx/redirect/*.conf;
