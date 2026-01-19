@@ -1,4 +1,4 @@
-script_version=0.2.9
+script_version=0.3.0
 igbinary_version=3.2.16
 php_memcached_version=3.3.0
 php_redis_version=6.2.0
