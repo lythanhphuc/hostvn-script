@@ -135,7 +135,7 @@ if [[ " ${OS_LIST[*]} " == *" ${OS} "* ]]; then
             yum -y update
             yum -y install dos2unix
         else
-            create_source_list
+            #create_source_list
             apt autoremove -y
             apt -y install dos2unix
         fi
