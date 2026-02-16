@@ -886,7 +886,7 @@ mariadb_calculation() {
         write_buffer="128M"
     fi
 
-    if [[ "$(expr "${RAM_TOTAL}" \>= 33586432)" == "1" ]]; then #32GB Ram
+    if (( RAM_TOTAL >= 33586432 )); then #32GB Ram
         max_allowed_packet="64M"
         back_log="1024"
         max_connections="600"
@@ -920,7 +920,7 @@ mariadb_calculation() {
         write_buffer="256M"
     fi
 
-    if [[ "$(expr "${RAM_TOTAL}" \>= 64000000)" == "1" ]]; then #64GB Ram
+    if (( RAM_TOTAL >= 64000000 )); then #64GB Ram
         max_allowed_packet="80M"
         back_log="1024"
         max_connections="800"
