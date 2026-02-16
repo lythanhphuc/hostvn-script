@@ -21,7 +21,7 @@ Script được viết bằng shell dùng để cài đặt LEMP Stack (Nginx - 
 ## 2. Cách cài đặt
 
 ```shell
-curl -sO https://script.ltp.io.vn/install && chmod +x install && ./install
+curl -sO https://raw.githubusercontent.com/lythanhphuc/hostvn-script/refs/heads/master/install && chmod +x install && ./install
 ```
 
 ## 3. Chi tiết Script:
