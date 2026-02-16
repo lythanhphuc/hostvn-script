@@ -502,11 +502,14 @@ install_phpmyadmin() {
 
     # Remove setup (bao mat)
     rm -rf phpmyadmin/setup
-	
-	mv "${DEFAULT_DIR_TOOL}"/phpmyadmin/config.sample.inc.php "${DEFAULT_DIR_TOOL}"/phpmyadmin/config.inc.php
+    
+    mv "${DEFAULT_DIR_TOOL}"/phpmyadmin/config.sample.inc.php "${DEFAULT_DIR_TOOL}"/phpmyadmin/config.inc.php
 
-    BLOWFISH_SECRET=$(random_string 64)
-	mkdir -p "${DEFAULT_DIR_TOOL}"/phpmyadmin/tmp
+    # --- SỬA Ở ĐÂY: Đổi 64 thành 32 ---
+    BLOWFISH_SECRET=$(random_string 32)
+    # ----------------------------------
+
+    mkdir -p "${DEFAULT_DIR_TOOL}"/phpmyadmin/tmp
 
     cat > "${DEFAULT_DIR_TOOL}/phpmyadmin/config.inc.php" <<EOF
 <?php
