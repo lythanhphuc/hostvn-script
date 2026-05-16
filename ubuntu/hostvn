@@ -92,7 +92,7 @@ gen_pass() {
 }
 
 random_string() {
-    STRING=$(perl -le "print map+(A..Z,a..z,0..9)[rand 62],0..$1")
+    STRING=$(perl -le "print map+(A..Z,a..z,0..9)[rand 62],1..$1")
     echo "$STRING"
 }
 
