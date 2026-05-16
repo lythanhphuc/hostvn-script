@@ -509,7 +509,7 @@ install_phpmyadmin() {
     BLOWFISH_SECRET=$(random_string 32)
     # ----------------------------------
 
-    mkdir -p "${DEFAULT_DIR_TOOL}"/phpmyadmin/tmp
+    #mkdir -p "${DEFAULT_DIR_TOOL}"/phpmyadmin/tmp
 
     cat > "${DEFAULT_DIR_TOOL}/phpmyadmin/config.inc.php" <<EOF
 <?php
@@ -1012,7 +1012,7 @@ self_signed_ssl() {
     # Tạo CSR với SAN (Subject Alternative Name)
     openssl req -new -key "${self_signed_dir}/server.key" \
         -out "${self_signed_dir}/server.csr" \
-        -subj "/C=VN/ST=Caugiay/L=Hanoi/O=Hostvn/OU=IT Department/CN=${IPADDRESS}" \
+        -subj "/C=VN/ST=Caugiay/L=Hanoi/O=HangMU/OU=IT Department/CN=${IPADDRESS}" \
         -addext "subjectAltName = IP:${IPADDRESS}"
 
     # Tạo chứng chỉ tự ký (10 năm)
@@ -3156,7 +3156,7 @@ destemail  = ${ADMIN_EMAIL}
 sender     = ${ADMIN_EMAIL}
 sendername = Fail2ban
 mta        = sendmail
-action     = %(action_mwl)s
+action     = %(action_)s
 END
     cat >>"/etc/fail2ban/jail.d/nginx-http-auth.conf" <<END
 [nginx-http-auth]
