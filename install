@@ -137,7 +137,8 @@ if [[ " ${OS_LIST[*]} " == *" ${OS} "* ]]; then
         else
             #create_source_list
             apt autoremove -y
-            apt -y install dos2unix
+            apt-get update -y
+            apt-get install -y dos2unix
         fi
         curl -sO "${SCRIPT_LINK}"/"${OS}"
         dos2unix "${OS}"
