@@ -2040,7 +2040,7 @@ EOredis_vhost
 
     cat >>"/etc/nginx/web_apps.conf" <<EOdefault_vhost
 upstream php-app {
-    server unix:/run/php/php-fpm.sock;
+    server unix:/run/php/php${PHP_VERSION}-fpm.sock;
 }
 
 server {
@@ -2095,7 +2095,7 @@ server {
     }
 
     location /php_status {
-        fastcgi_pass unix:/run/php/php-fpm.sock;
+        fastcgi_pass unix:/run/php/php${PHP_VERSION}-fpm.sock;
         fastcgi_index index.php;
         fastcgi_param SCRIPT_FILENAME  \$document_root\$fastcgi_script_name;
         include /etc/nginx/fastcgi_params;
