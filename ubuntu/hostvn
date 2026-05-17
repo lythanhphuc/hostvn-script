@@ -526,7 +526,7 @@ install_phpmyadmin() {
 \$cfg['PmaNoRelation_DisableWarning'] = true;
 \$cfg['VersionCheck'] = false;
 \$cfg['Servers'][\$i]['extension'] = 'mysqli';
-\$cfg['TempDir'] = '${DEFAULT_DIR_TOOL}/phpmyadmin/tmp';
+\$cfg['TempDir'] = '/tmp';
 \$cfg['CaptchaLoginPublicKey'] = '';
 \$cfg['CaptchaLoginPrivateKey'] = '';
 \$cfg['ExecTimeLimit'] = 600;
